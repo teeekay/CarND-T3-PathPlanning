@@ -1,5 +1,6 @@
 //
-// Created by Stanislav Olekhnovich on 02/08/2017.
+// Framework Created by Stanislav Olekhnovich on 02/08/2017.
+// Customized by Anthony Knight on 17/01/2018
 //
 
 #include "WebSocketMessageHandler.h"
@@ -73,7 +74,8 @@ PathPlannerInput WebSocketMessageHandler::ReadPlannerInput(json data)
 
 string WebSocketMessageHandler::GetMessageContent(const string& message)
 {
-    string content;
+    //string content;
+	string content = "";
 
     bool hasNullContent = (message.find("null") != string::npos);
     if (hasNullContent)
@@ -92,17 +94,21 @@ bool WebSocketMessageHandler::MessageHasExpectedPrefix(const string& message)
 {
     // "42" at the start of the message means there's a websocket message event.
     const string prefix {"42"};
+	//std::cout << "MessageHasExpectedPrefix: Message is \n" << message << "\n----" << std::endl;
     return (message.substr(0, prefix.size()) == prefix);
 }
 
 void WebSocketMessageHandler::HandleMessage(const string& message, uWS::WebSocket<uWS::SERVER>& ws)
 {
-    if (!MessageHasExpectedPrefix(message))
-        return;
+	if (!MessageHasExpectedPrefix(message))
+	//	std::cout << "Received Message with unexpected prefix in \n" << message << "\n - discarding." << std::endl;
+       return;
 
     auto content = GetMessageContent(message);
     if (content.empty())
     {
+		// empty telemetry events are received when simulator issues a warning - like exceeding Jerk 
+		// if there is no reply then will stop system from proceeding.
         SendDefaultResponse(ws);
         return;
     }

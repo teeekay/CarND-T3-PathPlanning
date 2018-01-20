@@ -1,5 +1,6 @@
 //
 // Created by Stanislav Olekhnovich on 17/10/2017.
+// Modified by Anthony M Knight 18/01/2018
 //
 
 #include <vector>
@@ -7,11 +8,17 @@
 
 #include "SimpleSplineBasedPlanner.h"
 
-double deg2rad(double x) { return x * M_PI / 180; }
-double MphToMetersPerSecond(double mphValue) { return mphValue / 2.24; }
+#define G_FORCE_MPS 9.8
 
-const double DefaultAcceleration = .224;
+double deg2rad(double x) { return x * M_PI / 180; }
+double MphToMetersPerSecond(double mphValue) { return mphValue * (1609.34 / 3600.0); }
+
+// maximum safe acceleration per step
+const double DefaultAcceleration = 0.2;// .224;
+//const double DefaultAccelerationMPS = 0.5 * G_FORCE_MPS; /* 0.5 times force of gravity */
 const double MaxSpeed = 49.5;
+//const double MaxSpeedMPH = 49.5;
+
 static const int XAxisPlanningHorizon = 30;
 const double CriticalThresholdInMeters = 30;
 const double SimulatorRunloopPeriod = 0.02;
@@ -23,11 +30,14 @@ std::vector<CartesianPoint> SimpleSplineBasedPlanner::GeneratePath(PathPlannerIn
     if (IsTooCloseToOtherCar(input))
     {
         targetSpeed -= DefaultAcceleration;
+		//targetSpeed -= getAcceleration(3);
         targetLane = LeftmostLaneNumber;
     }
-    else if (targetSpeed < MaxSpeed)
+    //else if (targetSpeed < MaxSpeedMPH)
+	else if (targetSpeed < MaxSpeed)
     {
         targetSpeed += DefaultAcceleration;
+		//targetSpeed += getAcceleration(3);
     }
 
     auto anchorsGenerationResult = GenerateAnchorPoints(input);
@@ -43,6 +53,9 @@ std::vector<CartesianPoint> SimpleSplineBasedPlanner::GeneratePath(PathPlannerIn
     return outputPath;
 }
 
+
+// lets change this to return car object from which we can get distance, 
+// this could be used to assist with adjusting deceleration (more/less)
 bool SimpleSplineBasedPlanner::IsTooCloseToOtherCar(const PathPlannerInput &input) const
 {
     double egoPredictedEndpointS = !input.Path.empty() ? input.PathEndpointFrenet.S : input.LocationFrenet.S;
@@ -52,7 +65,7 @@ bool SimpleSplineBasedPlanner::IsTooCloseToOtherCar(const PathPlannerInput &inpu
         if (otherCar.IsInLane(targetLane))
         {
             double otherCarPredictedS = otherCar.LocationFrenet.S +
-                                        (input.Path.size() * SimulatorRunloopPeriod * otherCar.Speed2DMagnitude() * 0.447);
+                                        (input.Path.size() * SimulatorRunloopPeriod * otherCar.Speed2DMagnitudeMpS());
             if (otherCarPredictedS > egoPredictedEndpointS &&
                     (otherCarPredictedS - egoPredictedEndpointS) < CriticalThresholdInMeters)
                 return true;
@@ -67,16 +80,19 @@ SimpleSplineBasedPlanner::AnchorPointsGenerationResult SimpleSplineBasedPlanner:
     // FIXME: Why do we do this?
     referencePoint.Theta = deg2rad(referencePoint.Theta);
 
+
+
     std::vector<CartesianPoint> anchors;
-    if (input.Path.empty() || input.Path.size() == 1)
+    if (input.Path.empty() || input.Path.size() == 1) // if there are not at least 2 elements in the previous path to use, then we generate 2.
     {
-        anchors.push_back({input.LocationCartesian.X - cos(input.LocationCartesian.Theta),
-                           input.LocationCartesian.Y - sin(input.LocationCartesian.Theta)});
+		double delta_t = 0.02; // small time period to look back for previous location of car
+        anchors.push_back({input.LocationCartesian.X - delta_t * cos(input.LocationCartesian.Theta),
+                           input.LocationCartesian.Y - delta_t * sin(input.LocationCartesian.Theta)});
         anchors.push_back(referencePoint);
     }
     else
     {
-        referencePoint = input.Path.back();
+		referencePoint = input.Path[input.Path.size() - 1]; // just to make more obvious .back();
         auto prevPoint = input.Path[input.Path.size() - 2];
         
         referencePoint.Theta = atan2(referencePoint.Y - prevPoint.Y, referencePoint.X - prevPoint.X);

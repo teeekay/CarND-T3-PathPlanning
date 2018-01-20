@@ -1,0 +1,71 @@
+{
+  "configurations": [
+    {
+      "inheritEnvironments": [
+        "linux-gcc-x64"
+      ],
+      "name": "Linux-Debug",
+      "includePath": [
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\include\\c++\\5",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\include\\x86_64-linux-gnu\\c++\\5",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\include\\c++\\5\\backward",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\lib\\gcc\\x86_64-linux-gnu\\5\\include",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\local\\include",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\lib\\gcc\\x86_64-linux-gnu\\5\\include-fixed",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\include\\x86_64-linux-gnu",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\include"
+      ],
+      "defines": [
+        "_DEBUG",
+        "UNICODE",
+        "_UNICODE"
+      ],
+      "intelliSenseMode": "linux-gcc-x64"
+    },
+    {
+      "inheritEnvironments": [
+        "linux-gcc-x64"
+      ],
+      "name": "Linux-Release",
+      "includePath": [
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\include\\c++\\5",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\include\\x86_64-linux-gnu\\c++\\5",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\include\\c++\\5\\backward",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\lib\\gcc\\x86_64-linux-gnu\\5\\include",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\local\\include",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\lib\\gcc\\x86_64-linux-gnu\\5\\include-fixed",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\include\\x86_64-linux-gnu",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\include"
+      ],
+      "defines": [
+        "NDEBUG",
+        "UNICODE",
+        "_UNICODE"
+      ],
+      "intelliSenseMode": "linux-gcc-x64"
+    },
+    {
+      "inheritEnvironments": [
+        "msvc_x64"
+      ],
+      "name": "x64-Release",
+      "includePath": [
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\include\\c++\\5",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\include\\x86_64-linux-gnu\\c++\\5",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\include\\c++\\5\\backward",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\lib\\gcc\\x86_64-linux-gnu\\5\\include",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\local\\include",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\lib\\gcc\\x86_64-linux-gnu\\5\\include-fixed",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\include\\x86_64-linux-gnu",
+        "${env.LOCALAPPDATA}\\lxss\\rootfs\\usr\\include"
+      ],
+      "defines": [
+        "WIN32",
+        "NDEBUG",
+        "UNICODE",
+        "_UNICODE"
+      ],
+      "intelliSenseMode": "windows-msvc-x64"
+    }
+  ]
+}
