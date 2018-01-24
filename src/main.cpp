@@ -8,6 +8,8 @@
 //#include <Eigen/Core>
 #endif
 #include <fstream>
+#include <chrono>
+#include <ctime>
 #include <thread>
 #include "json.hpp"
 
@@ -29,10 +31,12 @@ using std::cerr;
 const int StartingLane = 1;
 
 
+
 int main(int argc, char * argv[])
 {
 	uWS::Hub h;
 	HighwayMap map("../data/highway_map.csv");
+	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 
 #ifdef KEEPLANE_PATHPLANNER
 	  KeepLanePathPlanner pathPlanner(map, StartingLane);
@@ -42,16 +46,19 @@ int main(int argc, char * argv[])
 
 	WebSocketMessageHandler handler(pathPlanner);
 
-	h.onMessage([&handler](uWS::WebSocket<uWS::SERVER> ws,
+	h.onMessage([&handler,&start](uWS::WebSocket<uWS::SERVER> ws,
 						   char * data,
 						   size_t length,
 						   uWS::OpCode opCode)
 				{
+		            std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 					if (length <= 2) // sometimes get messages containing just "2"
 						return;
 
 					string message (data, length);
-					cout << "\ninbound message received ->\n" << message << "\n <- end of message." << endl;
+					std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count()
+						<< " mSecs since initiation - msg recived." << std::endl;
+						//"\ninbound message received ->\n" << message << "\n <- end of message." << endl;
 					handler.HandleMessage(message, ws);
 				});
 

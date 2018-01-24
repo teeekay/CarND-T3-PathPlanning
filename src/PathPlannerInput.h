@@ -17,7 +17,8 @@ struct PathPlannerInput
     FrenetPoint LocationFrenet;
     FrenetPoint PathEndpointFrenet;
 
-    double Speed;
+    double SpeedMpH;
+	double SpeedMpS;
 
     std::vector<CartesianPoint> Path;
 

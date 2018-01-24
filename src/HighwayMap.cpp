@@ -7,6 +7,7 @@
 #include <uWS/uWS.h>
 #include <fstream>
 #include <sstream>
+#include <algorithm>
 
 HighwayMap::HighwayMap(const std::string &highwayMapCsvPath)
 {
@@ -96,11 +97,16 @@ int HighwayMap::NextWaypoint(CartesianPoint currentVehicleLocation) const
     double heading = atan2( (map_y- currentVehicleLocation.Y),(map_x- currentVehicleLocation.X) );
 
     double angle = std::abs(currentVehicleLocation.Theta - heading);
+	angle = std::min(2 * M_PI_4 - angle, angle); //added to match baumanb fix
 
     if(angle > M_PI_4)
     {
         closestWaypoint++;
     }
+	if (closestWaypoint >= mapPointsX.size())
+	{
+	  closestWaypoint = 0;
+	}
 
     return closestWaypoint;
 }

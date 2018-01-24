@@ -16,7 +16,11 @@ public:
 private:
     double targetSpeed;
 
-    bool IsTooCloseToOtherCar(const PathPlannerInput &input) const;
+
+	std::vector<OtherCar> IsTooCloseToOtherCar(const PathPlannerInput &input) const;
+	//bool IsTooCloseToOtherCar(const PathPlannerInput &input) const;
+
+	bool CreateCarPlan(std::vector<OtherCar> &Cars, FrenetPoint EgoCar);
 
     std::vector<CartesianPoint> ConvertPointsToLocalSystem(const std::vector<CartesianPoint> &newPathAnchorPoints,
                                const CartesianPoint &localReferencePoint) const;

@@ -46,7 +46,8 @@ PathPlannerInput WebSocketMessageHandler::ReadPlannerInput(json data)
 
     pathPlannerInput.LocationCartesian= { data["x"], data["y"], data["yaw"] };
     pathPlannerInput.LocationFrenet= { data["s"], data["d"] };
-    pathPlannerInput.Speed = data["speed"];
+    pathPlannerInput.SpeedMpH = data["speed"];
+	pathPlannerInput.SpeedMpS = pathPlannerInput.SpeedMpH * (1609.34 / 3600.0);
     pathPlannerInput.PreviousPathX = data["previous_path_x"].get<std::vector<double>>();
     pathPlannerInput.PreviousPathY = data["previous_path_y"].get<std::vector<double>>();
 
@@ -61,7 +62,8 @@ PathPlannerInput WebSocketMessageHandler::ReadPlannerInput(json data)
     for (auto& otherCarData : sensorFusionData)
     {
         OtherCar otherCar;
-        otherCar.LocationCartesian = { otherCarData[1], otherCarData[2] };
+		otherCar.id = otherCarData[0];
+		otherCar.LocationCartesian = { otherCarData[1], otherCarData[2] };
         otherCar.XAxisSpeed = otherCarData[3];
         otherCar.YAxisSpeed = otherCarData[4];
         otherCar.LocationFrenet = { otherCarData[5], otherCarData[6] };
@@ -122,7 +124,8 @@ void WebSocketMessageHandler::HandleMessage(const string& message, uWS::WebSocke
 void WebSocketMessageHandler::SendDefaultResponse(uWS::WebSocket<uWS::SERVER>& ws) const
 {
     string response = "42[\"manual\",{}]";
-    std::cout << response << std::endl;
+    //std::cout << response << std::endl;
+	std::cout << "..";
     ws.send(response.data(), response.length(), uWS::TEXT);
 }
 

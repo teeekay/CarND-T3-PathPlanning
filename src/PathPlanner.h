@@ -17,6 +17,7 @@ public:
 
 protected:
     const HighwayMap& map;
+	int currentLane;  //add this maybe for lane changes
     int targetLane;
 };
 
