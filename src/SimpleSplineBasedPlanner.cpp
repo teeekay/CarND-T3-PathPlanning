@@ -16,7 +16,7 @@
 // maximum safe acceleration per step
 
 const double DefaultAcceleration = 0.2;// .224;
-const double MaxAccelerationMpSsq = 0.225 * G_FORCE_MPS; /* 0.25 times force of gravity */ //0.25 still exceeds max decelleration when approaching slow cars
+const double MaxAccelerationMpSsq = 0.20 * G_FORCE_MPS; /* 0.25 times force of gravity */ //0.25 still exceeds max decelleration when approaching slow cars
 const double MaxSpeedMpH = 49.0;//47.5
 const double MaxSpeedinLaneChangeMpH = 48.0;
 
@@ -29,7 +29,8 @@ const double SimulatorRunloopPeriod = 0.02;
 static const int MaxNumberOfPointsInPath = 50;
 const int LeftmostLaneNumber = 0;
 
-double deg2rad(double x) { return x * M_PI / 180; }
+double rad2deg(double x) { return x * 180.0 / M_PI; }
+double deg2rad(double x) { return x * M_PI / 180.0; }
 double MphToMetersPerSecond(double mphValue) { return mphValue * (1609.34 / 3600.0); }
 double safeAcceleration(double accel) { return (fabs(accel) > MaxAccelerationMpSsq) ? fabs(accel) / accel * MaxAccelerationMpSsq : accel; }
 
@@ -281,7 +282,7 @@ SimpleSplineBasedPlanner::AnchorPointsGenerationResult SimpleSplineBasedPlanner:
 {
     CartesianPoint referencePoint = input.LocationCartesian;
     // FIXME: Why do we do this?
-    referencePoint.Theta = deg2rad(referencePoint.Theta);
+    //referencePoint.ThetaDegrees = deg2rad(referencePoint.ThetaDegrees);
 
 
 
@@ -289,8 +290,8 @@ SimpleSplineBasedPlanner::AnchorPointsGenerationResult SimpleSplineBasedPlanner:
     if (input.Path.empty() || input.Path.size() == 1) // if there are not at least 2 elements in the previous path to use, then we generate 2.
     {
 		double delta_t = 0.02; // small time period to look back for previous location of car
-        anchors.push_back({input.LocationCartesian.X - delta_t * cos(input.LocationCartesian.Theta),
-                           input.LocationCartesian.Y - delta_t * sin(input.LocationCartesian.Theta)});
+        anchors.push_back({input.LocationCartesian.X - delta_t * cos(input.LocationCartesian.ThetaRads),
+                           input.LocationCartesian.Y - delta_t * sin(input.LocationCartesian.ThetaRads)});
         anchors.push_back(referencePoint);
     }
     else
@@ -298,7 +299,7 @@ SimpleSplineBasedPlanner::AnchorPointsGenerationResult SimpleSplineBasedPlanner:
 		referencePoint = input.Path[input.Path.size() - 1]; // just to make more obvious .back();
         auto prevPoint = input.Path[input.Path.size() - 2];
         
-        referencePoint.Theta = atan2(referencePoint.Y - prevPoint.Y, referencePoint.X - prevPoint.X);
+        referencePoint.ThetaRads = atan2(referencePoint.Y - prevPoint.Y, referencePoint.X - prevPoint.X);
 
         anchors.push_back(prevPoint);
         anchors.push_back(referencePoint);
@@ -373,6 +374,8 @@ tk::spline SimpleSplineBasedPlanner::GetSplineFromAnchorPoints(const std::vector
     {
         newPathAnchorsX.push_back(p.X);
         newPathAnchorsY.push_back(p.Y);
+		std::cout << "AnchorXs [" << p.X << "]." << std::endl;
+
     }
     tk::spline spline;
     spline.set_points(newPathAnchorsX, newPathAnchorsY);

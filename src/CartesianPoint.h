@@ -10,21 +10,21 @@ struct CartesianPoint
 {
     double X;
     double Y;
-    double Theta;
+    double ThetaRads;
 
     CartesianPoint() = default;
-    CartesianPoint(double X, double Y, double Theta = 0.0) : X(X), Y(Y), Theta(Theta) {}
+    CartesianPoint(double X, double Y, double ThetaRads = 0.0) : X(X), Y(Y), ThetaRads(ThetaRads) {}
     inline CartesianPoint ToLocal(const CartesianPoint &localReferencePoint) const
     {
         double shiftX = X - localReferencePoint.X;
         double shiftY = Y - localReferencePoint.Y;
-        return {(shiftX * cos(-localReferencePoint.Theta) - shiftY * sin(-localReferencePoint.Theta)),
-                (shiftX * sin(-localReferencePoint.Theta) + shiftY * cos(-localReferencePoint.Theta))};
+        return {(shiftX * cos(-localReferencePoint.ThetaRads) - shiftY * sin(-localReferencePoint.ThetaRads)),
+                (shiftX * sin(-localReferencePoint.ThetaRads) + shiftY * cos(-localReferencePoint.ThetaRads))};
     };
     inline CartesianPoint ToGlobal(const CartesianPoint& localReferencePoint) const
     {
-        return { localReferencePoint.X + (X * cos(localReferencePoint.Theta) - Y * sin(localReferencePoint.Theta)),
-                 localReferencePoint.Y + (X * sin(localReferencePoint.Theta) + Y * cos(localReferencePoint.Theta))};
+        return { localReferencePoint.X + (X * cos(localReferencePoint.ThetaRads) - Y * sin(localReferencePoint.ThetaRads)),
+                 localReferencePoint.Y + (X * sin(localReferencePoint.ThetaRads) + Y * cos(localReferencePoint.ThetaRads))};
     };
 
 };

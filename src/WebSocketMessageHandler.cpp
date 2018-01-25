@@ -44,12 +44,14 @@ PathPlannerInput WebSocketMessageHandler::ReadPlannerInput(json data)
 {
     PathPlannerInput pathPlannerInput;
 
-    pathPlannerInput.LocationCartesian= { data["x"], data["y"], data["yaw"] };
+    pathPlannerInput.LocationCartesian= { data["x"], data["y"], data["yaw"].get<double>() * M_PI / 180.0 };
     pathPlannerInput.LocationFrenet= { data["s"], data["d"] };
     pathPlannerInput.SpeedMpH = data["speed"];
 	pathPlannerInput.SpeedMpS = pathPlannerInput.SpeedMpH * (1609.34 / 3600.0);
     pathPlannerInput.PreviousPathX = data["previous_path_x"].get<std::vector<double>>();
     pathPlannerInput.PreviousPathY = data["previous_path_y"].get<std::vector<double>>();
+
+	std::cout << "Yaw = " << pathPlannerInput.LocationCartesian.ThetaRads << "Radians" << std::endl;
 
     assert(pathPlannerInput.PreviousPathX.size() == pathPlannerInput.PreviousPathY.size());
     for (int i = 0; i < pathPlannerInput.PreviousPathX.size(); i++)

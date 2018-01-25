@@ -32,7 +32,7 @@ CartesianPoint HighwayMap::FrenetToCartesian(const FrenetPoint& frenetPoint) con
     double seg_x = mapPointsX[previousPoint]+seg_s*cos(heading);
     double seg_y = mapPointsY[previousPoint]+seg_s*sin(heading);
 
-    double perp_heading = heading-M_PI_2;
+    double perp_heading = heading-M_PI_2; // PI/2.
 
     double x = seg_x + frenetPoint.D * cos(perp_heading);
     double y = seg_y + frenetPoint.D * sin(perp_heading);
@@ -96,10 +96,10 @@ int HighwayMap::NextWaypoint(CartesianPoint currentVehicleLocation) const
 
     double heading = atan2( (map_y- currentVehicleLocation.Y),(map_x- currentVehicleLocation.X) );
 
-    double angle = std::abs(currentVehicleLocation.Theta - heading);
-	angle = std::min(2 * M_PI_4 - angle, angle); //added to match baumanb fix
+    double angle = std::abs(currentVehicleLocation.ThetaRads*M_PI/180.0 - heading);
+	angle = std::min(2 * M_PI - angle, angle); //added to match baumanb fix
 
-    if(angle > M_PI_4)
+    if(angle > M_PI_4)  // > PI/4
     {
         closestWaypoint++;
     }
