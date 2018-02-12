@@ -1,5 +1,6 @@
 //
 // Created by Stanislav Olekhnovich on 17/10/2017.
+// Updated by Anthony M Knight on 25/01/2017
 //
 
 #ifndef PATH_PLANNING_SIMPLESPLINEBASEDPLANNER_H
@@ -8,14 +9,26 @@
 #include "PathPlanner.h"
 #include "spline.h"
 
+
+const double SplineMaxSpeedMpH = 49.0;//47.5
+const double SplineMaxSpeedinLaneChangeMpH = 48.0;
+
 class SimpleSplineBasedPlanner : public PathPlanner
 {
 public:
-    explicit SimpleSplineBasedPlanner(const HighwayMap &map, int startingLane): PathPlanner(map, startingLane), targetSpeed(.0) {};
+    explicit SimpleSplineBasedPlanner(const HighwayMap &map, int startingLane): PathPlanner(map, startingLane), targetSpeed(.0),
+		MaxSpeedMpS(MphToMetersPerSecond(SplineMaxSpeedMpH)), MaxSpeedInLaneChangeMpS (MphToMetersPerSecond(SplineMaxSpeedinLaneChangeMpH)),
+		acceleration(0.0), laststep_targetspeed(0.0) {};
     std::vector<CartesianPoint> GeneratePath(PathPlannerInput input) override;
 private:
     double targetSpeed;
+	double MaxSpeedInLaneChangeMpS;
+	double MaxSpeedMpS;
+	double acceleration;
+	double laststep_targetspeed;
+	double currentSpeedMpS;
 
+	double safeAcceleration(double accel);
 
 	std::vector<OtherCar> IsTooCloseToOtherCar(const PathPlannerInput &input) const;
 	//bool IsTooCloseToOtherCar(const PathPlannerInput &input) const;

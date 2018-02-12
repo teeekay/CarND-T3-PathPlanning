@@ -1,6 +1,7 @@
 //
 // Created by Stanislav Olekhnovich on 13/10/2017.
 //
+// Used to load Highway data points and transform co-ords between Cartesian and Frenet
 
 #ifndef PATH_PLANNING_HIGHWAYMAP_H
 #define PATH_PLANNING_HIGHWAYMAP_H
@@ -11,6 +12,19 @@
 
 #include "CartesianPoint.h"
 #include "FrenetPoint.h"
+#include "spline.h"
+#include "spdlog/spdlog.h"
+
+#define MAX_S 6945.554
+
+inline double RangeS(double S)
+{
+	while (S < 0) { S += MAX_S; }
+	S = fmod(S, MAX_S);
+	return S;
+}
+
+double headingdifference(double Theta1, double Theta2);
 
 class HighwayMap
 {
@@ -20,19 +34,40 @@ public:
     FrenetPoint CartesianToFrenet(const CartesianPoint& cartesianPoint) const;
     int NextWaypoint(CartesianPoint currentVehicleLocation) const;
     int ClosestWaypoint(CartesianPoint currentVehicleLocation) const;
+	//CartesianPoint Frenet2Cartesian(const FrenetPoint& FPt) const;
+	std::vector<CartesianPoint> ConvertCurveMaintainSpeed(std::vector<FrenetPoint> Path, CartesianPoint StartCPt) const;
+	//std::shared_ptr<spdlog::logger> map_logger;
 
 private:
-    std::vector<double> mapPointsX;
-    std::vector<double> mapPointsY;
-    std::vector<double> mapPointsS;
-    std::vector<double> mapPointsDX;
-    std::vector<double> mapPointsDY;
+	std::vector<double> mapPointsX;
+	std::vector<double> mapPointsY;
+	std::vector<double> mapPointsS;
+	std::vector<double> mapPointsDX;
+	std::vector<double> mapPointsDY;
+	std::vector<double> mapPointsTheta;
 
-    void ReadMapFromCsvFile(const std::string& highwayMapCsvPath);
+	std::vector<double> DiscreteX;
+	std::vector<double> DiscreteY;
+	std::vector<double> DiscreteS;
+	std::vector<double> DiscreteTheta;
+
+	void ReadMapFromCsvFile(const std::string& highwayMapCsvPath);
+	void LoadSSplines();
+
+	tk::spline SplineFrenetSToX;
+	tk::spline SplineFrenetSToY;
+	tk::spline SplineFrenetSToDX;
+	tk::spline SplineFrenetSToDY;
+	tk::spline SplineFrenetSToTheta;
+	
     inline double EuclidDistance(CartesianPoint p1, CartesianPoint p2) const
     {
         return sqrt((p2.X-p1.X)*(p2.X-p1.X)+(p2.Y-p1.Y)*(p2.Y-p1.Y));
     }
+	
+
+
+	
 };
 
 #endif //PATH_PLANNING_HIGHWAYMAP_H

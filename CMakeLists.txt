@@ -7,7 +7,10 @@ add_definitions(-std=c++11)
 set(CXX_FLAGS "-Wall")
 set(CMAKE_CXX_FLAGS, "${CXX_FLAGS}")
 
-set(sources src/main.cpp src/WebSocketMessageHandler.cpp src/KeepLanePathPlanner.cpp src/KeepLanePathPlanner.h src/OutputPath.h src/PathPlannerInput.h src/CartesianPoint.h src/HighwayMap.cpp src/FrenetPoint.h src/PathPlanner.h src/SimpleSplineBasedPlanner.cpp src/SimpleSplineBasedPlanner.h src/spline.h src/OtherCar.h)
+set(sources src/main.cpp src/WebSocketMessageHandler.cpp src/KeepLanePathPlanner.cpp src/KeepLanePathPlanner.h 
+    src/OutputPath.h src/PathPlannerInput.h src/CartesianPoint.h src/HighwayMap.cpp src/FrenetPoint.h src/PathPlanner.h
+	src/SimpleSplineBasedPlanner.cpp src/SimpleSplineBasedPlanner.h src/spline.h src/OtherCar.h src/RoadMap.cpp 
+	src/RoadMap.h src/JMT.cpp src/JMT.h src/JMTBasedPlanner.cpp src/JMTBasedPlanner.h src/spdlog/spdlog.h)
 
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux") 
@@ -31,4 +34,4 @@ endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 add_executable(path-plan ${sources})
 
-target_link_libraries(path-plan z ssl uv uWS)
+target_link_libraries(path-plan z ssl uv uWS pthread)

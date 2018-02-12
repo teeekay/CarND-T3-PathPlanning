@@ -10,7 +10,7 @@ struct CartesianPoint
 {
     double X;
     double Y;
-    double ThetaRads;
+    double ThetaRads;  //Renamed to emphasize this is radians
 
     CartesianPoint() = default;
     CartesianPoint(double X, double Y, double ThetaRads = 0.0) : X(X), Y(Y), ThetaRads(ThetaRads) {}
@@ -26,6 +26,10 @@ struct CartesianPoint
         return { localReferencePoint.X + (X * cos(localReferencePoint.ThetaRads) - Y * sin(localReferencePoint.ThetaRads)),
                  localReferencePoint.Y + (X * sin(localReferencePoint.ThetaRads) + Y * cos(localReferencePoint.ThetaRads))};
     };
+	inline double EuclidDistance(const CartesianPoint& p1) const
+	{
+		return sqrt((X - p1.X)*(X - p1.X) + (Y - p1.Y)*(Y - p1.Y));
+	}
 
 };
 

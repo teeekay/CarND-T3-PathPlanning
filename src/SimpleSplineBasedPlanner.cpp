@@ -11,43 +11,21 @@
 #include <iterator>
 
 #include "SimpleSplineBasedPlanner.h"
+#include "RoadMap.h"
 
 #define G_FORCE_MPS 9.8
 // maximum safe acceleration per step
 
-const double DefaultAcceleration = 0.2;// .224;
-const double MaxAccelerationMpSsq = 0.20 * G_FORCE_MPS; /* 0.25 times force of gravity */ //0.25 still exceeds max decelleration when approaching slow cars
-const double MaxSpeedMpH = 49.0;//47.5
-const double MaxSpeedinLaneChangeMpH = 48.0;
-
+//const double DefaultAcceleration = 0.2;// .224;
+const double MaxFwdAccelerationMpSsq = 0.20 * G_FORCE_MPS; /* 0.25 times force of gravity */ //0.25 still exceeds max deceleration when approaching slow cars
+const double MaxBrakingAccelerationMpSsq = -0.30 * G_FORCE_MPS; /* 0.25 times force of gravity */ //0.2 still exceeds max deceleration when approaching slow cars
 // if we plan 50 points ahead at maximum speed of 49.5 mph = 22.1 mps, and at 0.02 sec intervals, we will only go out 22.1 m.
 
-
 static const int XAxisPlanningHorizon = 30;
-const double CriticalThresholdInMeters = 15;
+const double CriticalThresholdInMeters = 20; //15
 const double SimulatorRunloopPeriod = 0.02;
 static const int MaxNumberOfPointsInPath = 50;
-const int LeftmostLaneNumber = 0;
-
-double rad2deg(double x) { return x * 180.0 / M_PI; }
-double deg2rad(double x) { return x * M_PI / 180.0; }
-double MphToMetersPerSecond(double mphValue) { return mphValue * (1609.34 / 3600.0); }
-double safeAcceleration(double accel) { return (fabs(accel) > MaxAccelerationMpSsq) ? fabs(accel) / accel * MaxAccelerationMpSsq : accel; }
-
-const double MaxSpeedMpS = MphToMetersPerSecond(MaxSpeedMpH);
-const double MaxSpeedInLaneChangeMpS = MphToMetersPerSecond(MaxSpeedinLaneChangeMpH);
-double acceleration = 0.0;
-double laststep_targetspeed = 0.0;
-
-double currentSpeedMpS;
-
-//STATES
-//Initial
-//Starting up.
-//Stay in lane
-//Match Speed of Car ahead
-//Get ready for lane change
-//Change lane
+//const int LeftmostLaneNumber = 0;
 
 
 
@@ -82,7 +60,7 @@ std::vector<CartesianPoint> SimpleSplineBasedPlanner::GeneratePath(PathPlannerIn
 		if (tmp_targetSpeed > MaxSpeedInLaneChangeMpS) {
 			tmp_targetSpeed = MaxSpeedInLaneChangeMpS; //reduce speed slightly in lane change)
 		}
-		//sometimes this blows up
+		
 		laststep_targetspeed = 50.0 * sqrt(pow((input.Path.at(input.Path.size() - 1).X - input.Path.at(input.Path.size() - 2).X),2.0) +
 			pow((input.Path.at(input.Path.size() - 1).Y - input.Path.at(input.Path.size() - 2).Y), 2.0));
 		std::cout << "laststep_targetspeed calculated as " << laststep_targetspeed << " with Path.size of " << input.Path.size() 
@@ -103,27 +81,29 @@ std::vector<CartesianPoint> SimpleSplineBasedPlanner::GeneratePath(PathPlannerIn
 			double tmp_targetSpeed = 0.99 * CloseCarsinLane[0].Speed2DMagnitudeMpS();// what about check for car going too fast or wrong direction?
 
 			// maybe we should rebuild spline at this point to start slowing down sooner.
-			if (input.PreviousPathX.size() > 10) {
-				input.PreviousPathX.resize(10);
-				input.PreviousPathY.resize(10);
-				input.Path.resize(10);
+			if (input.PreviousPathX.size() > 5) {
+				input.PreviousPathX.resize(5);
+				input.PreviousPathY.resize(5);
+				input.Path.resize(5);
 				input.PathEndpointFrenet = map.CartesianToFrenet(input.Path.back());
 			}
 
-
+			laststep_targetspeed = 50.0 * sqrt(pow((input.Path.at(input.Path.size() - 1).X - input.Path.at(input.Path.size() - 2).X), 2.0) +
+				pow((input.Path.at(input.Path.size() - 1).Y - input.Path.at(input.Path.size() - 2).Y), 2.0));
 			//acceleration = safeAcceleration(input.SpeedMpS - tmp_targetSpeed); //change in speed over 1 second
-			acceleration = safeAcceleration(laststep_targetspeed - tmp_targetSpeed); //change in speed over 1 second
-
-			targetSpeed = laststep_targetspeed - acceleration * (MaxNumberOfPointsInPath - input.PreviousPathX.size()) / MaxNumberOfPointsInPath;
+			std::cout << "acceleration  initially " << tmp_targetSpeed - laststep_targetspeed << " m/s^2.";
+			acceleration = safeAcceleration(tmp_targetSpeed - laststep_targetspeed); //change in speed over 1 second
+			std::cout << "SafeAcceleration returns " << acceleration << " m/s^2." << std::endl;
+			targetSpeed = laststep_targetspeed + acceleration * (MaxNumberOfPointsInPath - input.PreviousPathX.size()) / MaxNumberOfPointsInPath;
 
 			std::cout << "Car Ahead!: Trying to slow down from " << input.SpeedMpS << " to " << laststep_targetspeed << " (at end of existing spline) to " << targetSpeed << " M/sec" << std::endl;
 		}
 		else if (input.SpeedMpS < MaxSpeedMpS)
 		{
 
-			acceleration = MaxAccelerationMpSsq;
-			targetSpeed = (MaxSpeedMpS > laststep_targetspeed + MaxAccelerationMpSsq * (MaxNumberOfPointsInPath - input.PreviousPathX.size()) / MaxNumberOfPointsInPath)
-				? laststep_targetspeed + MaxAccelerationMpSsq * (MaxNumberOfPointsInPath - input.PreviousPathX.size()) / MaxNumberOfPointsInPath : MaxSpeedMpS; // DefaultAcceleration;
+			acceleration = MaxFwdAccelerationMpSsq;
+			targetSpeed = (MaxSpeedMpS > laststep_targetspeed + MaxFwdAccelerationMpSsq * (MaxNumberOfPointsInPath - input.PreviousPathX.size()) / MaxNumberOfPointsInPath)
+				? laststep_targetspeed + MaxFwdAccelerationMpSsq * (MaxNumberOfPointsInPath - input.PreviousPathX.size()) / MaxNumberOfPointsInPath : MaxSpeedMpS; // DefaultAcceleration;
 			std::cout << "Increasing velocity at end of spline to target of " << targetSpeed << "m/s.  " << (MaxNumberOfPointsInPath - input.PreviousPathX.size()) << " points in planner left." << std::endl;
 			//targetSpeed += getAcceleration(3);
 		}
@@ -173,12 +153,14 @@ std::vector<CartesianPoint> SimpleSplineBasedPlanner::GeneratePath(PathPlannerIn
 				double tmp_distance = otherCarPredictedS - egoPredictedEndpointS;
 				if (tmp_distance < distance)
 				{
-					std::cout << "Adding otherCar ID [" << otherCar.id << "] with projected distance " << tmp_distance << " m to end of queue." << std::endl;
+					std::cout << "Adding otherCar ID [" << otherCar.id << "] with projected distance " << tmp_distance << " m and speed "
+						<< otherCar.Speed2DMagnitudeMpS() << " m/s to end of queue." << std::endl;
 					CloseCarsInLane.push_back(otherCar);
 				}
 				else
 				{
-					std::cout << "Inserting otherCar ID [" << otherCar.id << "] with projected distance " << tmp_distance << " m to start of queue." << std::endl;
+					std::cout << "Inserting otherCar ID [" << otherCar.id << "] with projected distance " << tmp_distance << " m and speed "
+						<< otherCar.Speed2DMagnitudeMpS() << " m / s to start of queue." << std::endl;
 					CloseCarsInLane.insert(CloseCarsInLane.begin(), otherCar);
 					
 				}
@@ -354,7 +336,7 @@ SimpleSplineBasedPlanner::GenerateNewPointsWithSpline(const tk::spline &newPathS
         double y = newPathSpline(x);
 		std::cout << "Pathpoint " << i << ": " << x << ", " << y << std::endl;
 
-		laststep_targetspeed = sqrt(pow(x-prevX,2.0)+pow(y-prevY,2.0))/ SimulatorRunloopPeriod;
+		//laststep_targetspeed = sqrt(pow(x-prevX,2.0)+pow(y-prevY,2.0))/ SimulatorRunloopPeriod;
 		prevX = x;
 		prevY = y;
 		accelStep = accelStep + accelInc;
@@ -374,10 +356,15 @@ tk::spline SimpleSplineBasedPlanner::GetSplineFromAnchorPoints(const std::vector
     {
         newPathAnchorsX.push_back(p.X);
         newPathAnchorsY.push_back(p.Y);
-		std::cout << "AnchorXs [" << p.X << "]." << std::endl;
+		//std::cout << "AnchorXs [" << p.X << "]." << std::endl;
 
     }
     tk::spline spline;
     spline.set_points(newPathAnchorsX, newPathAnchorsY);
     return spline;
+}
+
+double SimpleSplineBasedPlanner::safeAcceleration(double accel) {
+	return ((accel >= 0) ? (accel > MaxFwdAccelerationMpSsq) ? MaxFwdAccelerationMpSsq : accel :
+		(accel < MaxBrakingAccelerationMpSsq) ? MaxBrakingAccelerationMpSsq : accel);
 }

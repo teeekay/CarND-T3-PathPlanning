@@ -7,18 +7,26 @@
 
 #include "HighwayMap.h"
 #include "PathPlannerInput.h"
+#include "spdlog/spdlog.h"
 
+const int LeftmostLaneNumber = 0;
 
 class PathPlanner
 {
 public:
-    explicit PathPlanner(const HighwayMap &map, int startingLane) : map(map), targetLane(startingLane) {}
+    explicit PathPlanner(const HighwayMap &map, int startingLane) : map(map), targetLane(startingLane), _logger (spdlog::get("PathPlannerLogger")) {}
+//	explicit PathPlanner(const HighwayMap &map, int startingLane) : map(map), targetLane(startingLane) {}
     virtual std::vector<CartesianPoint> GeneratePath(PathPlannerInput input) = 0;
-
+	inline double rad2deg(double x) { return x * 180.0 / M_PI; }
+	inline double deg2rad(double x) { return x * M_PI / 180.0; }
+	inline double MphToMetersPerSecond(double mphValue) { return mphValue * (1609.34 / 3600.0); }
+	double MaxSpeedMpS;
+	double MaxSpeedInLaneChangeMpS;
 protected:
     const HighwayMap& map;
 	int currentLane;  //add this maybe for lane changes
     int targetLane;
+	std::shared_ptr<spdlog::logger> _logger;
 };
 
 

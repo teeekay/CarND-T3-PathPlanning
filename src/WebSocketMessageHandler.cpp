@@ -11,10 +11,13 @@ string WebSocketMessageHandler::CreateResponseMessage(const std::vector<Cartesia
 
     std::vector<double> pathX;
     std::vector<double> pathY;
+
+	//std::cout << "sending co-ordinates:" << std::endl;
     for (auto& p: path)
     {
         pathX.push_back(p.X);
         pathY.push_back(p.Y);
+		//std::cout << p.X << ", " << p.Y << std::endl;
     }
 
     msgJson["next_x"] = pathX;
@@ -28,6 +31,8 @@ string WebSocketMessageHandler::ProcessMessageContent(string& content)
 {
     auto jsonContent = json::parse(content);
     string eventType = jsonContent[0].get<string>();
+
+//	std::cout << jsonContent << std::endl;
 
     string response;
     if (eventType == "telemetry")
@@ -44,19 +49,41 @@ PathPlannerInput WebSocketMessageHandler::ReadPlannerInput(json data)
 {
     PathPlannerInput pathPlannerInput;
 
-    pathPlannerInput.LocationCartesian= { data["x"], data["y"], data["yaw"].get<double>() * M_PI / 180.0 };
+	//convert to radians and move to between PI and -PI range
+	double heading = data["yaw"].get<double>() * M_PI / 180.0;
+
+	if (heading > M_PI) {
+		while (heading > M_PI) {
+			heading -= (2 * M_PI);
+		}
+	}
+	if (heading < -M_PI) {
+		while (heading < -M_PI) {
+			heading += (2 * M_PI);
+		}
+	}
+    pathPlannerInput.LocationCartesian= { data["x"], data["y"], heading};
     pathPlannerInput.LocationFrenet= { data["s"], data["d"] };
     pathPlannerInput.SpeedMpH = data["speed"];
 	pathPlannerInput.SpeedMpS = pathPlannerInput.SpeedMpH * (1609.34 / 3600.0);
     pathPlannerInput.PreviousPathX = data["previous_path_x"].get<std::vector<double>>();
     pathPlannerInput.PreviousPathY = data["previous_path_y"].get<std::vector<double>>();
 
-	std::cout << "Yaw = " << pathPlannerInput.LocationCartesian.ThetaRads << "Radians" << std::endl;
+//	std::cout << "receiving Path:" << std::endl;
 
     assert(pathPlannerInput.PreviousPathX.size() == pathPlannerInput.PreviousPathY.size());
+	
+	double Theta;
     for (int i = 0; i < pathPlannerInput.PreviousPathX.size(); i++)
     {
-        pathPlannerInput.Path.emplace_back(pathPlannerInput.PreviousPathX[i], pathPlannerInput.PreviousPathY[i]);
+		if (i == 0) {
+			Theta = pathPlannerInput.LocationCartesian.ThetaRads;
+		}
+		else {
+			Theta = atan2(pathPlannerInput.PreviousPathY.at(i) - pathPlannerInput.PreviousPathY.at(i - 1), pathPlannerInput.PreviousPathX.at(i) - pathPlannerInput.PreviousPathX.at(i - 1));
+		}
+        pathPlannerInput.Path.emplace_back(pathPlannerInput.PreviousPathX.at(i), pathPlannerInput.PreviousPathY.at(i), Theta);
+//		std::cout << pathPlannerInput.Path.back().X << ", " << pathPlannerInput.Path.back().Y << ", " << pathPlannerInput.Path.back().ThetaRads << std::endl;
     }
 
     pathPlannerInput.PathEndpointFrenet = { data["end_path_s"], data["end_path_d"] };
@@ -127,7 +154,7 @@ void WebSocketMessageHandler::SendDefaultResponse(uWS::WebSocket<uWS::SERVER>& w
 {
     string response = "42[\"manual\",{}]";
     //std::cout << response << std::endl;
-	std::cout << "..";
+	//std::cout << "..";
     ws.send(response.data(), response.length(), uWS::TEXT);
 }
 
