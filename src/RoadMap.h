@@ -8,7 +8,7 @@
 
 #include "PathPlanner.h"
 #include "spline.h"
-
+#include "spdlog/spdlog.h"
 
 
 
@@ -16,7 +16,9 @@
 class RoadMap
 {
 public:
-	RoadMap(PathPlannerInput input) : ThisStepInput(input), EgoCar(input.LocationFrenet), PlanTargetLane(input.LocationFrenet.GetLane()) {};
+	RoadMap(PathPlannerInput input) :
+		ThisStepInput(input), EgoCar(input.LocationFrenet), PlanTargetLane(input.LocationFrenet.GetLane()) 
+	    { _loggerRoadMap = spdlog::get("PathPlannerLogger"); };
 	int CreateRoadMap();
 	int check_lanes();
 	int CheckForSlowCarsAhead();
@@ -39,6 +41,7 @@ private:
 					  //Layers in RoadMapDeck split between Ego Car and OtherCars 
 	const int EgoCarLayer = 0;
 	const int OtherCarsLayer = 1;
+	std::shared_ptr<spdlog::logger> _loggerRoadMap;
 };
 
 #endif //ROADMAPLANNER_H

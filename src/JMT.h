@@ -17,7 +17,7 @@ public:
 private:
 	std::vector<std::vector<double>> JMTcoefficients;
 	double T;
-	std::shared_ptr<spdlog::logger> _logger;
+	std::shared_ptr<spdlog::logger> _logger3;
 };
 
 #endif // JMT_H

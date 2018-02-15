@@ -28,7 +28,7 @@ private:
 	double laststep_targetspeed;
 	double currentSpeedMpS;
 
-	double safeAcceleration(double accel);
+	double GetSafeAcceleration(double accel);
 
 	std::vector<OtherCar> IsTooCloseToOtherCar(const PathPlannerInput &input) const;
 	//bool IsTooCloseToOtherCar(const PathPlannerInput &input) const;

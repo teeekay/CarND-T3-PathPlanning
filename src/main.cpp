@@ -46,19 +46,14 @@ const int StartingLane = 1;
 int main(int argc, char * argv[])
 {
 	uWS::Hub h;
+
+	auto console = spd::stdout_color_st("console");
+	auto my_logger = spd::basic_logger_st("PathPlannerLogger", "/mnt/c/Users/tknight/Source/Repos/CarND/CarND-T3-PathPlanning/Ubuntu_build/logs/PathPlanner.txt");
+	console->info("Starting Path Planning System up");
+
 	//HighwayMap map("../data/highway_map.csv");
 	HighwayMap map("/mnt/c/Users/tknight/Source/Repos/CarND/CarND-T3-PathPlanning/data/highway_map.csv");
 
-	// Console logger with color
-	auto console = spd::stdout_color_st("console");
-	console->info("Welcome to spdlog!");
-	// Create basic file logger (not rotated)
-	//auto sharedFileSink = std::make_shared<spdlog::sinks::simple_file_sink_st>("/mnt/c/Users/tknight/Source/Repos/CarND/CarND-T3-PathPlanning/Ubuntu_build/logs/PathPlanner.txt");
-
-	auto my_logger = spd::basic_logger_st("PathPlannerLogger", "/mnt/c/Users/tknight/Source/Repos/CarND/CarND-T3-PathPlanning/Ubuntu_build/logs/PathPlanner.txt");
-	//auto map_logger = spd::basic_logger_mt("HighwayMapLogger", "/mnt/c/Users/tknight/Source/Repos/CarND/CarND-T3-PathPlanning/Ubuntu_build/logs/HighwayMap.log");
-	
-	console->info("Starting Path Planning System up");
 
 	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 

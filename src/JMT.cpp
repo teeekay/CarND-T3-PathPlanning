@@ -38,7 +38,7 @@ JMT::JMT(vector< double> start_s, vector< double> start_d, vector <double> end_s
 	> JMT( [0, 10, 0], [10, 10, 0], 1)
 	[0.0, 10.0, 0.0, 0.0, 0.0, 0.0]
 	*/
-	_logger = spdlog::get("PathPlannerLogger");
+	_logger3 = spdlog::get("PathPlannerLogger");
 	this->T = T;
 
 	std::vector<std::vector<double>> StartState = { start_s, start_d };
@@ -95,11 +95,12 @@ FrenetPoint JMT::JMTDisplacementAt(double t) {
 	}
 	FrenetPoint JMTLocationAt_t(Displacement.at(0), Displacement.at(1));
 
-	/*_logger->info("{:02.2f}, {:+.4f}, {:+.4f}, {:+.4f}, {:+.4f}, {:+.4f}, {:+.4f}, {:+.4f}, {:+.4f}",
-		  t, Displacement.at(0), Displacement.at(1), Velocity.at(0), Velocity.at(1), Acceleration.at(0), Acceleration.at(1),
-		  Jerk.at(0), Jerk.at(1));*/
+	if((Velocity.at(0) > 22.2) or (-5.0 > Acceleration.at(0) > 5.0))
+	{
+		_logger3->warn("Param exceeds t,S,D,Vel_S,Vel_D,Acc_S,Acc_D,Jerk_S,Jerk_D");
+		_logger3->warn("{:02.2f}, {:+.4f}, {:+.4f}, {:+.4f}, {:+.4f}, {:+.4f}, {:+.4f}, {:+.4f}, {:+.4f}",
+			t, Displacement.at(0), Displacement.at(1), Velocity.at(0), Velocity.at(1), Acceleration.at(0), Acceleration.at(1),
+			Jerk.at(0), Jerk.at(1)); 
+	}
 	return(JMTLocationAt_t);
 }
-
-
-

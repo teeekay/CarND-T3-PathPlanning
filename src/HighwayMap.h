@@ -34,9 +34,7 @@ public:
     FrenetPoint CartesianToFrenet(const CartesianPoint& cartesianPoint) const;
     int NextWaypoint(CartesianPoint currentVehicleLocation) const;
     int ClosestWaypoint(CartesianPoint currentVehicleLocation) const;
-	//CartesianPoint Frenet2Cartesian(const FrenetPoint& FPt) const;
-	std::vector<CartesianPoint> ConvertCurveMaintainSpeed(std::vector<FrenetPoint> Path, CartesianPoint StartCPt) const;
-	//std::shared_ptr<spdlog::logger> map_logger;
+	std::vector<CartesianPoint> ConvertCurveMaintainSpeed(std::vector<FrenetPoint>& Path, CartesianPoint StartCPt) const;
 
 private:
 	std::vector<double> mapPointsX;
@@ -59,15 +57,11 @@ private:
 	tk::spline SplineFrenetSToDX;
 	tk::spline SplineFrenetSToDY;
 	tk::spline SplineFrenetSToTheta;
-	
+	std::shared_ptr<spdlog::logger> _loggerHighwayMap;
     inline double EuclidDistance(CartesianPoint p1, CartesianPoint p2) const
     {
         return sqrt((p2.X-p1.X)*(p2.X-p1.X)+(p2.Y-p1.Y)*(p2.Y-p1.Y));
-    }
-	
-
-
-	
+    }	
 };
 
 #endif //PATH_PLANNING_HIGHWAYMAP_H

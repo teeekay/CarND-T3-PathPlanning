@@ -56,9 +56,9 @@ std::vector<CartesianPoint> SimpleSplineBasedPlanner::GeneratePath(PathPlannerIn
 			input.Path.resize(6);
 			input.PathEndpointFrenet = map.CartesianToFrenet(input.Path.back());  //this might need to be redone
 		}
-		double tmp_targetSpeed = currentSpeedMpS;
-		if (tmp_targetSpeed > MaxSpeedInLaneChangeMpS) {
-			tmp_targetSpeed = MaxSpeedInLaneChangeMpS; //reduce speed slightly in lane change)
+		double TempTargetSpeed = currentSpeedMpS;
+		if (TempTargetSpeed > MaxSpeedInLaneChangeMpS) {
+			TempTargetSpeed = MaxSpeedInLaneChangeMpS; //reduce speed slightly in lane change)
 		}
 		
 		laststep_targetspeed = 50.0 * sqrt(pow((input.Path.at(input.Path.size() - 1).X - input.Path.at(input.Path.size() - 2).X),2.0) +
@@ -66,7 +66,7 @@ std::vector<CartesianPoint> SimpleSplineBasedPlanner::GeneratePath(PathPlannerIn
 		std::cout << "laststep_targetspeed calculated as " << laststep_targetspeed << " with Path.size of " << input.Path.size() 
 //			<< " and S1=" << map.CartesianToFrenet(input.Path.at(input.Path.size() - 5)).S << " and S0=" << map.CartesianToFrenet(input.Path.at(input.Path.size() - 6)).S 
 			<< std::endl;
-		acceleration = safeAcceleration(tmp_targetSpeed - laststep_targetspeed);
+		acceleration = GetSafeAcceleration(TempTargetSpeed - laststep_targetspeed);
 		std::cout << "Initiating Lane Change from Lane " << input.LocationFrenet.GetLane() << " to Lane " << targetLane << ", with acceleration of " << acceleration << std::endl;
 
 	}
@@ -78,7 +78,7 @@ std::vector<CartesianPoint> SimpleSplineBasedPlanner::GeneratePath(PathPlannerIn
 
 		if (!CloseCarsinLane.empty())
 		{
-			double tmp_targetSpeed = 0.99 * CloseCarsinLane[0].Speed2DMagnitudeMpS();// what about check for car going too fast or wrong direction?
+			double TempTargetSpeed = 0.99 * CloseCarsinLane[0].Speed2DMagnitudeMpS();// what about check for car going too fast or wrong direction?
 
 			// maybe we should rebuild spline at this point to start slowing down sooner.
 			if (input.PreviousPathX.size() > 5) {
@@ -90,9 +90,9 @@ std::vector<CartesianPoint> SimpleSplineBasedPlanner::GeneratePath(PathPlannerIn
 
 			laststep_targetspeed = 50.0 * sqrt(pow((input.Path.at(input.Path.size() - 1).X - input.Path.at(input.Path.size() - 2).X), 2.0) +
 				pow((input.Path.at(input.Path.size() - 1).Y - input.Path.at(input.Path.size() - 2).Y), 2.0));
-			//acceleration = safeAcceleration(input.SpeedMpS - tmp_targetSpeed); //change in speed over 1 second
-			std::cout << "acceleration  initially " << tmp_targetSpeed - laststep_targetspeed << " m/s^2.";
-			acceleration = safeAcceleration(tmp_targetSpeed - laststep_targetspeed); //change in speed over 1 second
+			//acceleration = GetSafeAcceleration(input.SpeedMpS - tmp_targetSpeed); //change in speed over 1 second
+			std::cout << "acceleration  initially " << TempTargetSpeed - laststep_targetspeed << " m/s^2.";
+			acceleration = GetSafeAcceleration(TempTargetSpeed - laststep_targetspeed); //change in speed over 1 second
 			std::cout << "SafeAcceleration returns " << acceleration << " m/s^2." << std::endl;
 			targetSpeed = laststep_targetspeed + acceleration * (MaxNumberOfPointsInPath - input.PreviousPathX.size()) / MaxNumberOfPointsInPath;
 
@@ -364,7 +364,7 @@ tk::spline SimpleSplineBasedPlanner::GetSplineFromAnchorPoints(const std::vector
     return spline;
 }
 
-double SimpleSplineBasedPlanner::safeAcceleration(double accel) {
+double SimpleSplineBasedPlanner::GetSafeAcceleration(double accel) {
 	return ((accel >= 0) ? (accel > MaxFwdAccelerationMpSsq) ? MaxFwdAccelerationMpSsq : accel :
 		(accel < MaxBrakingAccelerationMpSsq) ? MaxBrakingAccelerationMpSsq : accel);
 }

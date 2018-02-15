@@ -124,9 +124,9 @@ int RoadMap::check_lanes() {
 		MinLaneClearFWD.push_back(minclearfwd);
 		MinLaneClearBACK.push_back(minclearback);
 	}
-	std::cout << "Min FWD clearance over next "<< NumIncrements*TimeIncrement <<" seconds - " << MinLaneClearFWD.at(0) << ", " << MinLaneClearFWD.at(1) << ", " << MinLaneClearFWD.at(2);
-	std::cout << ".  Min Back clearance over next " << NumIncrements * TimeIncrement << " seconds - " << MinLaneClearBACK.at(0) << ", " << MinLaneClearBACK.at(1) << ", " << MinLaneClearBACK.at(2);
-	std::cout << std::endl;
+	_loggerRoadMap->info("RoadMap: Next {}s Min clearances projected FWD [ {}, {}, {} ] , BACK [ {}, {}, {} ].", 
+	        NumIncrements*TimeIncrement, MinLaneClearFWD.at(0), MinLaneClearFWD.at(1), MinLaneClearFWD.at(2),
+		    MinLaneClearBACK.at(0), MinLaneClearBACK.at(1), MinLaneClearBACK.at(2));
 	return 0;
 }
 
@@ -193,22 +193,23 @@ int RoadMap::CheckForLaneChange() {
 int RoadMap::CheckForSlowCarsAhead()
 {
 	// if we have at least 30 m in the next X second window, everything is fine (?)
-	std::cout << "Showing " << MinLaneClearFWD.at(EgoCar.GetLane()) << " m clear ahead in lane " << EgoCar.GetLane()<< std::endl;
+	//std::cout << "Showing " << MinLaneClearFWD.at(EgoCar.GetLane()) << " m clear ahead in lane " << EgoCar.GetLane()<< std::endl;
 	if(MinLaneClearFWD.at(EgoCar.GetLane()) > 30) return -1;
 	int OtherCarID = RoadMapDeck.at(OtherCarsLayer).at(0).at(EgoCar.GetLane()).at(
 		    RevLimit + clearlanelengthsFWD.at(0).at(EgoCar.GetLane()));
-	std::cout << "Found OtherCarID = " << OtherCarID-1 << std::endl;
+	_loggerRoadMap->info("RoadMap: Found OtherCarID = {} at distance of {:3.2f} m.", OtherCarID-1, clearlanelengthsFWD.at(0).at(EgoCar.GetLane()));
 	return OtherCarID-1;
 }
 
 int RoadMap::CheckForSlowCarsAhead(double distance)
 {
 	// if we have at least 30 m in the next X second window, everything is fine (?)
-	std::cout << "Showing " << MinLaneClearFWD.at(EgoCar.GetLane()) << " m clear ahead in lane " << EgoCar.GetLane() << std::endl;
+	//std::cout << "Showing " << MinLaneClearFWD.at(EgoCar.GetLane()) << " m clear ahead in lane " << EgoCar.GetLane() << std::endl;
 	if (MinLaneClearFWD.at(EgoCar.GetLane()) > distance) return -1;
 	int OtherCarID = RoadMapDeck.at(OtherCarsLayer).at(0).at(EgoCar.GetLane()).at(
 		RevLimit + clearlanelengthsFWD.at(0).at(EgoCar.GetLane()));
-	std::cout << "Found OtherCarID = " << OtherCarID - 1 << std::endl;
+	_loggerRoadMap->info("RoadMap: Found OtherCarID = {} at distance of {:3.2f} m.", OtherCarID - 1, clearlanelengthsFWD.at(0).at(EgoCar.GetLane()));
+	//std::cout << "Found OtherCarID = " << OtherCarID - 1 << std::endl;
 	return OtherCarID - 1;
 }
 
