@@ -108,16 +108,19 @@ FrenetPoint Trajectory::GetFinalFAccel(std::vector<CartesianPoint>const & CPath)
 	double FSV1, FSV2, FDV1, FDV2;
 	double CV2, CV1;
 	FrenetPoint FAccel;
-	FSV2 = (RangeS(map2.CartesianToFrenet(CPath.at(CPath.size() - 1)).S - map2.CartesianToFrenet(CPath.at(CPath.size() - 2)).S))/ SimulatorRunloopPeriod;
-	FDV2 = (map2.CartesianToFrenet(CPath.at(CPath.size() - 1)).D - map2.CartesianToFrenet(CPath.at(CPath.size() - 2)).D)/ SimulatorRunloopPeriod;
-	FSV1 = (RangeS(map2.CartesianToFrenet(CPath.at(CPath.size() - 2)).S - map2.CartesianToFrenet(CPath.at(CPath.size() - 3)).S))/ SimulatorRunloopPeriod;
-	FDV1 = (map2.CartesianToFrenet(CPath.at(CPath.size() - 2)).D - map2.CartesianToFrenet(CPath.at(CPath.size() - 3)).D)/ SimulatorRunloopPeriod;
-	FAccel = { (FSV2 - FSV1) / SimulatorRunloopPeriod, (FDV2 - FDV1) / SimulatorRunloopPeriod };
-	_logger2->info("Trajectory: Calculated Frenet Acceleration of {:+2.3f}, {:+2.3f} at end of existing path.", FAccel.S, FAccel.D);
-	CV2 = CPath.at(CPath.size() - 1).EuclidDistance(CPath.at(CPath.size() - 2))/ SimulatorRunloopPeriod;
-	CV1 = CPath.at(CPath.size() - 2).EuclidDistance(CPath.at(CPath.size() - 3))/ SimulatorRunloopPeriod;
-	FAccel = { (CV2 - CV1) / SimulatorRunloopPeriod, 0.0 };
-	_logger2->info("Trajectory: Calculated Cartesian Acceleration of {:+2.3f}, {:+2.3f} at end of existing path.", FAccel.S, FAccel.D);
+	int AvgLength = CPath.size() > 10 ? 5 : CPath.size()/2;
+	int CPathEndPtr = CPath.size() - 1;
+	double DelT = double(AvgLength)*SimulatorRunloopPeriod;
+	FSV2 = (RangeS(map2.CartesianToFrenet(CPath.at(CPathEndPtr)).S - map2.CartesianToFrenet(CPath.at(CPathEndPtr - AvgLength)).S))/ DelT;
+	FDV2 = (map2.CartesianToFrenet(CPath.at(CPathEndPtr)).D - map2.CartesianToFrenet(CPath.at(CPathEndPtr - AvgLength)).D)/ DelT;
+	FSV1 = (RangeS(map2.CartesianToFrenet(CPath.at(CPathEndPtr - AvgLength)).S - map2.CartesianToFrenet(CPath.at(CPathEndPtr - AvgLength*2)).S))/ DelT;
+	FDV1 = (map2.CartesianToFrenet(CPath.at(CPathEndPtr - AvgLength)).D - map2.CartesianToFrenet(CPath.at(CPathEndPtr - AvgLength * 2)).D)/ DelT;
+	FAccel = { (FSV2 - FSV1) / DelT, (FDV2 - FDV1) / DelT };
+	_logger2->info("Trajectory: Frenet Acceleration calculated with DelT= {:+2.3f} gives {:+2.3f}, {:+2.3f} at end of existing path.", DelT, FAccel.S, FAccel.D);
+	CV2 = CPath.at(CPathEndPtr).EuclidDistance(CPath.at(CPathEndPtr-AvgLength))/ DelT;
+	CV1 = CPath.at(CPathEndPtr - AvgLength).EuclidDistance(CPath.at(CPathEndPtr - AvgLength * 2))/ DelT;
+	FAccel = { (CV2 - CV1) / DelT, 0.0 };
+	_logger2->info("Trajectory: Cartesian Acceleration calculated with DelT= {:+2.3f} gives {:+2.3f}, {:+2.3f} at end of existing path.", DelT, FAccel.S, FAccel.D);
 
 	return FAccel;
 }
@@ -140,7 +143,7 @@ std::vector<CartesianPoint> Trajectory::InitiateTrajectory(PathPlannerInput inpu
 	//generate frenet curve starting at the current location of the car
 	std::vector<FrenetPoint> StartupFPath = GenerateJMTPath(LastFPt, EndFPt, StartSpeed, LastSpeed, T, true);
 	// attempt to adjust for any effects of road curvature on speed while switching from frenet to cartesian
-	std::vector<CartesianPoint> CPath = map2.ConvertCurveMaintainSpeed(StartupFPath, LastCPt);
+	std::vector<CartesianPoint> CPath = map2.ConvertCurveMaintainSpeed(StartupFPath, LastCPt, false);
 	//adjust for any discrepancy between the known and calculated location of the path.
 	OffsetPath(CPath, LastCPt);
 
@@ -235,7 +238,7 @@ std::vector<CartesianPoint> Trajectory::GenerateKeepInLaneTrajectory( PathPlanne
 	{
 		FPath.clear();
 		FPath = GenerateJMTPath(EndFPt, NewEndFPt, EndFSpeed, TargetFSpeed, T, true, EndFAccel, TargetFAccel);
-		CPath = map2.ConvertCurveMaintainSpeed(FPath, EndCPt);
+		CPath = map2.ConvertCurveMaintainSpeed(FPath, EndCPt, false);
 
 		Acc_Jerk PathTest = CheckPath(CPath, SimulatorRunloopPeriod, EndFSpeed.S);
 		_logger2->info("Check Path ReCalcCounter={ } finds Maximum Velocity ={:3.3f} while MaxSpeedMPS is {:3.3f} Acceleration Maximum = {:+3.3f} while design Acceleration was {:+2.3f} ",
@@ -380,7 +383,7 @@ std::vector<CartesianPoint> Trajectory::GenerateJMTLaneChangeTrajectory(PathPlan
 	{
 		FPath.clear();
 		FPath = GenerateJMTPath(EndFPt, NewEndFPt, EndSpeed, TargetSpeed, T, true);
-		CPath = map2.ConvertCurveMaintainSpeed(FPath, EndCPt);
+		CPath = map2.ConvertCurveMaintainSpeed(FPath, EndCPt, false);
 
 		Acc_Jerk PathTest = CheckPath(CPath, SimulatorRunloopPeriod, EndSpeed.S);
 		_logger2->info("Check Path ReCalcCounter={} finds Maximum Velocity ={:3.3f} while MaxSpeedMPS is {:3.3f} Acceleration Maximum = {:+3.3f} while design Acceleration was {:+2.3f} ",
@@ -454,7 +457,7 @@ std::vector<CartesianPoint> Trajectory::GenerateJMTLaneChangeTrajectory(PathPlan
 	FrenetPoint RunoutEndFPt = { CurveEndFPt.S + TargetSpeed.S * T, CurveEndFPt.D };
 	FPath.clear();
 	FPath = GenerateJMTPath(CurveEndFPt, RunoutEndFPt, TargetSpeed, TargetSpeed, T, true);
-	std::vector<CartesianPoint> AddOnCPath = map2.ConvertCurveMaintainSpeed(FPath, LastCPt);
+	std::vector<CartesianPoint> AddOnCPath = map2.ConvertCurveMaintainSpeed(FPath, LastCPt, false);
 	OffsetPath(AddOnCPath, LastCPt);
 	//only want 30 points down lane
 	CPath.insert(CPath.end(), AddOnCPath.begin()+1, AddOnCPath.begin()+30);

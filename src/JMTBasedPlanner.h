@@ -9,7 +9,7 @@
 #include "spline.h"
 
 
-const double JMTCarinfrontbuffer = 15.0;//20.0
+const double JMTCarinfrontbuffer = 10.0;//15.0//20.0
 
 enum EGOState {
 	Uninitialized,
@@ -18,7 +18,7 @@ enum EGOState {
 	MatchVelocity
 };
 
-#define KEEP_LANE_MINIMUM_TIME 3000 //3000 mS
+#define KEEP_LANE_MINIMUM_TIME 2000 //3000 mS
 
 class JMTBasedPlanner : public PathPlanner, public Trajectory
 {

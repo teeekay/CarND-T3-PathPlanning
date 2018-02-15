@@ -34,7 +34,7 @@ public:
     FrenetPoint CartesianToFrenet(const CartesianPoint& cartesianPoint) const;
     int NextWaypoint(CartesianPoint currentVehicleLocation) const;
     int ClosestWaypoint(CartesianPoint currentVehicleLocation) const;
-	std::vector<CartesianPoint> ConvertCurveMaintainSpeed(std::vector<FrenetPoint>& Path, CartesianPoint StartCPt) const;
+	std::vector<CartesianPoint> ConvertCurveMaintainSpeed(std::vector<FrenetPoint>& Path, CartesianPoint StartCPt, bool SpeedControl=true) const;
 
 private:
 	std::vector<double> mapPointsX;

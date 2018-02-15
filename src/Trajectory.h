@@ -4,13 +4,14 @@
 #include "PathPlanner.h"
 #include "RoadMap.h"
 #include "JMT.h"
+#include "PathTracking.h"
 #include "spdlog/spdlog.h"
 
 #include "spline.h"
 
 #define G_FORCE_MPS 9.8
 
-const double JMTMaxSpeedMpH = 48.5;// 48.0;//
+const double JMTMaxSpeedMpH = 48.0;// 48.0;//
 const double JMTMaxSpeedinLaneChangeMpH = 46.0;// 47.0;//? verify empirically if needed
 
 struct Acc_Jerk
@@ -57,7 +58,7 @@ private:
 	const double MaxBrakingAccelerationMpSsq = -0.25 * G_FORCE_MPS; /* 0.25 times force of gravity */
 	const double SimulatorRunloopPeriod = 0.02;
 
-
+	PathTracking BuiltPath;
 
 //	double TargetSpeed;
 	double Acceleration;

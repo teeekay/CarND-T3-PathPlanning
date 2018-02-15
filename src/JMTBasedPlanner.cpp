@@ -158,7 +158,8 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 		{
 			targetSpeed = Trajectory::MaxSpeedMpS;
 			_logger->info("JMTBasedPlanner: send to GenerateKeepLane because only {} tracking points, DesiredVelocity = {}", pathsize, targetSpeed);
-			OutputPath = GenerateKeepInLaneTrajectory(input, targetSpeed);
+			//reset to truncate to reduce offset errors.
+			OutputPath = GenerateKeepInLaneTrajectory(input, targetSpeed, true);
 		}else{
 			_logger->info("JMTBasedPlanner: just use existing KeepInLane Path");
 			OutputPath = { OldPath };
@@ -178,6 +179,14 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 			if (input.LocationFrenet.GetLane() == targetLane)
 			{
 				targetSpeed = Trajectory::MaxSpeedMpS;
+				car_id = PlannerMap.CheckForSlowCarsAhead(JMTCarinfrontbuffer);
+				if (car_id > -1 and ((GetAcceleration() > 0) or (GetAcceleration() < 0 and pathsize < 30)))
+				{
+					//do we need to slow down
+					targetSpeed = 0.995 * input.OtherCars.at(car_id).Speed2DMagnitudeMpS();
+					_logger->info("JMTBasedPlanner: found Othercar id = {} at offset {} with velocity {:3.2f}",
+						input.OtherCars.at(car_id).id, car_id, input.OtherCars.at(car_id).Speed2DMagnitudeMpS());
+				}
 				_logger->info("JMTBasedPlanner: send to GenerateKeepInLane because in TargetLane {} with Pathsize of {} and DesiredVelocity = {}", targetLane, pathsize, targetSpeed);
 				OutputPath = GenerateKeepInLaneTrajectory(input, targetSpeed);
 			}

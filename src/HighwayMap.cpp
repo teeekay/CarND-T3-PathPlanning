@@ -204,8 +204,11 @@ CartesianPoint HighwayMap::FrenetToCartesian(const FrenetPoint& FPt) const
 
 //Attempt to convert Frenet Path to Cartesian while maintaining velocities in Frenet Path 
 //(by compensating for Radius of Curvature 
-std::vector<CartesianPoint> HighwayMap::ConvertCurveMaintainSpeed(std::vector<FrenetPoint> &Path, CartesianPoint StartCPt) const
+std::vector<CartesianPoint> HighwayMap::ConvertCurveMaintainSpeed(std::vector<FrenetPoint> &Path, CartesianPoint StartCPt, bool SpeedControl) const
 {
+	double arclength = 2.0; //try averaging over a longer distance to eliminate bumps.
+	double deltaTheta;
+
 	_loggerHighwayMap->info("HighwayMap: FrenetPath passed to ConvertCurveMaintainSpeed with original Cartesian translation.");
 	for (FrenetPoint & lFPt : Path)
 	{
@@ -223,9 +226,12 @@ std::vector<CartesianPoint> HighwayMap::ConvertCurveMaintainSpeed(std::vector<Fr
 		lCPt = FrenetToCartesian(Path.at(index));
 		_loggerHighwayMap->info("HighwayMap: Frenet Pt {:03d} {:03.3f}, {:03.3f} is Cart Pt {:03.3f}, {:03.3f} before adjustment.", 
 			    index, Path.at(index).S, Path.at(index).D, lCPt.X, lCPt.Y);
-		double arclength = 2.0; //try averaging over a longer distance to eliminate bumps.
-		double deltaTheta = headingdifference(atan2(SplineFrenetSToDY(Path.at(index).S + arclength/2.0), SplineFrenetSToDX(Path.at(index).S + arclength/2.0)),
-			atan2(SplineFrenetSToDY(Path.at(index).S - arclength / 2.0), SplineFrenetSToDX(Path.at(index).S - arclength / 2.0) ));
+		if (SpeedControl)
+		{
+			deltaTheta = headingdifference(atan2(SplineFrenetSToDY(Path.at(index).S + arclength / 2.0), SplineFrenetSToDX(Path.at(index).S + arclength / 2.0)),
+				atan2(SplineFrenetSToDY(Path.at(index).S - arclength / 2.0), SplineFrenetSToDX(Path.at(index).S - arclength / 2.0)));
+		}
+		else deltaTheta = 0.0;
 		if (fabs(deltaTheta) > 0.001) //curvature adjustment needs to be applied.
 		{
 			double kurvatureR = arclength / deltaTheta;

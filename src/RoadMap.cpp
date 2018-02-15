@@ -124,9 +124,11 @@ int RoadMap::check_lanes() {
 		MinLaneClearFWD.push_back(minclearfwd);
 		MinLaneClearBACK.push_back(minclearback);
 	}
-	_loggerRoadMap->info("RoadMap: Next {}s Min clearances projected FWD [ {}, {}, {} ] , BACK [ {}, {}, {} ].", 
+	_loggerRoadMap->info("RoadMap: Next {}s Min clearances projected FWD [ {}, {}, {} ] , BACK [ {}, {}, {} ]. currently FWD [ {}, {}, {} ] , BACK [ {}, {}, {} ]", 
 	        NumIncrements*TimeIncrement, MinLaneClearFWD.at(0), MinLaneClearFWD.at(1), MinLaneClearFWD.at(2),
-		    MinLaneClearBACK.at(0), MinLaneClearBACK.at(1), MinLaneClearBACK.at(2));
+		    MinLaneClearBACK.at(0), MinLaneClearBACK.at(1), MinLaneClearBACK.at(2)),
+			clearlanelengthsFWD.at(0).at(0), clearlanelengthsFWD.at(0).at(1), clearlanelengthsFWD.at(0).at(2),
+		    clearlanelengthsBACK.at(0).at(0), clearlanelengthsBACK.at(0).at(1), clearlanelengthsBACK.at(0).at(2);
 	return 0;
 }
 
@@ -139,7 +141,7 @@ int RoadMap::CheckForLaneChange() {
 	//check_lanes();
 
 	//if (clearlanelengthsFWD.at(0).at(EgoCar.GetLane()) < 50) {  //don't check for lanechange if still > 50 m clear ahead for next couple seconds
-	if ( MinLaneClearFWD.at(EgoCar.GetLane())< 50) {
+	if ( MinLaneClearFWD.at(EgoCar.GetLane())< 60) {
 		std::cout << "Now Fwd [" << clearlanelengthsFWD.at(0).at(0) <<", " << clearlanelengthsFWD.at(0).at(1) <<", " << clearlanelengthsFWD.at(0).at(2) << "] ";
 		std::cout << "Back [" << MinLaneClearBACK.at(0) << ", " << MinLaneClearBACK.at(1) << ", " << MinLaneClearBACK.at(2) << "] " << std::endl;
 
@@ -174,9 +176,9 @@ int RoadMap::CheckForLaneChange() {
 		}
 		//experimental to try to avoid/get out of traps on side lanes and not move over earlier
 		if ((EgoCar.GetLane() == 0) and (MinLaneClearFWD.at(1) > 20) and (MinLaneClearBACK.at(1) > 10)
-			and (MinLaneClearFWD.at(0) < 40) and (MinLaneClearFWD.at(2) > 50)) targetLane = 1;
+			and (MinLaneClearFWD.at(0) < 50) and (MinLaneClearFWD.at(2) > 60)) targetLane = 1;
 		if ((EgoCar.GetLane() == 2) and (MinLaneClearFWD.at(1) > 20) and (MinLaneClearBACK.at(1) > 10)
-			and (MinLaneClearFWD.at(2) < 40) and (MinLaneClearFWD.at(0) > 50)) targetLane = 1;
+			and (MinLaneClearFWD.at(2) < 50) and (MinLaneClearFWD.at(0) > 60)) targetLane = 1;
 	}
 	else
 	{

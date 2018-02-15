@@ -11,7 +11,7 @@ set(sources src/main.cpp src/WebSocketMessageHandler.cpp src/KeepLanePathPlanner
     src/OutputPath.h src/PathPlannerInput.h src/CartesianPoint.h src/HighwayMap.cpp src/FrenetPoint.h src/PathPlanner.h
 	src/PathPlanner.cpp src/SimpleSplineBasedPlanner.cpp src/SimpleSplineBasedPlanner.h src/spline.h src/OtherCar.h 
 	src/RoadMap.cpp src/RoadMap.h src/JMT.cpp src/JMT.h src/JMTBasedPlanner.cpp src/JMTBasedPlanner.h src/Trajectory.cpp
-	src/Trajectory.cpp src/spdlog/spdlog.h)
+	src/PathTracking.cpp src/PathTracking.h src/spdlog/spdlog.h)
 
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux") 
