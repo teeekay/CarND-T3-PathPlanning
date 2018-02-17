@@ -13,6 +13,9 @@ const double LaneCentreLocator = (LaneWidthInD / 2.0) * 0.95; //offset to check 
 															  // move centrelines of outside lanes in by 10 cm
 const std::vector<double> LaneCentreD = { 2.1,6.0,9.9 };
 
+
+//describe kinematics of car at specific point in time using S,D framework
+
 struct FrenetPoint
 {
     double S;
@@ -29,6 +32,16 @@ struct FrenetPoint
 	inline bool IsAtCenterofLane(int laneNumber) const {
 		        return (fabs(D - LaneCenterDCoord(laneNumber)) < 0.1) ? true : false; }
 };
+
+struct FrenetDescriptors
+{
+	FrenetPoint Displacement;
+	FrenetPoint Velocity;
+	FrenetPoint Acceleration;
+	FrenetPoint Jerk;
+	FrenetDescriptors() = default;
+};
+
 
 
 #endif //PATH_PLANNING_FRENETPOINT_H

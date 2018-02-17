@@ -9,7 +9,8 @@
 #include "spline.h"
 
 
-const double JMTCarinfrontbuffer = 10.0;//15.0//20.0
+
+const double JMTCarinfrontbuffer = 15.0;//15.0//20.0  //4 means you've hit it!
 
 enum EGOState {
 	Uninitialized,
@@ -24,7 +25,9 @@ class JMTBasedPlanner : public PathPlanner, public Trajectory
 {
 public:
 	explicit JMTBasedPlanner(const HighwayMap &map, int startingLane):
-		PathPlanner(map, startingLane), Trajectory(map), EgoState(Uninitialized) { };
+		PathPlanner(map, startingLane), Trajectory(map), EgoState(Uninitialized),
+		DeccelerationLoopCounter(0)
+	{ };
 	std::vector<CartesianPoint> GeneratePath(PathPlannerInput input) override;
 private:
 	double targetSpeed;
@@ -40,7 +43,7 @@ private:
 	std::chrono::system_clock::time_point KeepLaneTimer;
 
 //	FrenetPoint LastIterEndpointFPt;
-
+	int DeccelerationLoopCounter;
 	char* GetStateName();
 //	Trajectory Traj;
 };

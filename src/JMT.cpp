@@ -104,3 +104,40 @@ FrenetPoint JMT::JMTDisplacementAt(double t) {
 	}
 	return(JMTLocationAt_t);
 }
+//Returns location at time point t in Frenet coordinates
+// 0 < t < T
+FrenetDescriptors JMT::JMTFrenetDescriptorsAt(double t)
+{
+	//std::cout << "t is now " << t << "and T is " << T << std::endl;
+	assert(0.0 <= t <= T);
+	FrenetDescriptors FDesc;
+
+	std::vector<double> Displacement;
+	std::vector<double> Velocity;
+	std::vector<double> Acceleration;
+	std::vector<double> Jerk;
+	for (std::vector<double> Coeffs : JMTcoefficients)
+	{
+		Displacement.push_back(Coeffs.at(0) + Coeffs.at(1)*t + Coeffs.at(2)*t*t +
+			Coeffs.at(3)*t*t*t + Coeffs.at(4)*t*t*t*t + Coeffs.at(5)*t*t*t*t*t);
+		Velocity.push_back(Coeffs.at(1) + Coeffs.at(2)*t +
+			Coeffs.at(3)*t*t + Coeffs.at(4)*t*t*t + Coeffs.at(5)*t*t*t*t);
+		Acceleration.push_back(Coeffs.at(2) + Coeffs.at(3)*t + Coeffs.at(4)*t*t
+			+ Coeffs.at(5)*t*t*t);
+		Jerk.push_back(Coeffs.at(3) + Coeffs.at(4)*t + Coeffs.at(5)*t*t);
+	}
+	FDesc.Displacement = { Displacement.at(0), Displacement.at(1) };
+	FDesc.Velocity = {Velocity.at(0),Velocity.at(1) };
+	FDesc.Acceleration = { Acceleration.at(0),Acceleration.at(1) };
+	FDesc.Jerk = { Jerk.at(0), Jerk.at(1) };
+	
+	if ((Velocity.at(0) > 22.2) or (-5.0 > Acceleration.at(0) > 5.0))
+	{
+		_logger3->warn("JMT: Param exceeds t,S,D,Vel_S,Vel_D,Acc_S,Acc_D,Jerk_S,Jerk_D:" 
+		    "{:02.2f}, {:+.4f}, {:+.4f}, {:+.4f}, {:+.4f}, {:+.4f}, {:+.4f}, {:+.4f}, {:+.4f}",
+			t, Displacement.at(0), Displacement.at(1), Velocity.at(0), Velocity.at(1), Acceleration.at(0), Acceleration.at(1),
+			Jerk.at(0), Jerk.at(1));
+	}
+
+	return(FDesc);
+}

@@ -20,10 +20,20 @@ double Trajectory::GetAcceleration()
 	return Acceleration;
 }
 
-double Trajectory::GetSafeAcceleration(double accel)
+double Trajectory::GetSafeAcceleration(double Accel)
 {
-	return ((accel >= 0) ? (accel> MaxFwdAccelerationMpSsq) ? MaxFwdAccelerationMpSsq : accel :
-		(accel < MaxBrakingAccelerationMpSsq) ? MaxBrakingAccelerationMpSsq : accel);
+	double NewAccel;
+	if (Accel >= 0.0)
+	{
+		NewAccel = Accel > MaxFwdAccelerationMpSsq ? MaxFwdAccelerationMpSsq : Accel;
+	}
+	else
+	{
+		NewAccel = Accel < MaxBrakingAccelerationMpSsq ? MaxBrakingAccelerationMpSsq : Accel;
+	}
+	_logger2->info("Acceleration adjusted from {:+3.3} to {:+3.3f}", Accel, NewAccel);
+	
+	return NewAccel;
 }
 
 void Trajectory::OffsetPath(std::vector<CartesianPoint> &CPath, CartesianPoint LastCPt)
@@ -36,6 +46,13 @@ void Trajectory::OffsetPath(std::vector<CartesianPoint> &CPath, CartesianPoint L
 		CPath.at(i).X -= offset.X;
 		CPath.at(i).Y -= offset.Y;
 	}
+}
+
+CartesianPoint Trajectory::GetOffset(CartesianPoint CalcCPt, CartesianPoint KnownCPt)
+{
+	//offset_path by any discrepencies from FrenetToCartesian from known location
+	CartesianPoint Offset = { CalcCPt.X - KnownCPt.X, CalcCPt.Y - KnownCPt.Y };
+	return Offset;
 }
 
 //trim the path down to a new size where recalculated path can be added on 
@@ -74,15 +91,45 @@ std::vector<FrenetPoint> Trajectory::GenerateJMTPath(FrenetPoint LastFPt, Frenet
 
 	JMT Jerk = JMT(S_NowState, D_NowState, S_EndState, D_EndState, T);
 	FrenetPoint lFPt;
+	FrenetDescriptors lFDPt;
 	std::vector<FrenetPoint> FPath;
 	
 	for (double t = PathStartTime; t <= T; t += SimulatorRunloopPeriod)
 	{
-		lFPt = Jerk.JMTDisplacementAt(t);
-		FPath.push_back(lFPt);
+		//lFPt = Jerk.JMTDisplacementAt(t);
+		lFDPt = Jerk.JMTFrenetDescriptorsAt(t);
+		FPath.push_back(lFDPt.Displacement);
 	}
 	return FPath;
 }
+
+//Generate the Trajectory with the Jerk minimizing Algorithm
+// GenerateZero is a flag to determine if to return point at time = 0.0 , or not
+std::vector<FrenetDescriptors> Trajectory::GenerateJMTDPath(FrenetPoint LastFPt, FrenetPoint DestFPt, FrenetPoint LastSpeed, FrenetPoint TargetSpeed, double T,
+	bool GenerateZero, FrenetPoint LastAccel, FrenetPoint TargetAccel)
+{
+	double PathStartTime = GenerateZero ? 0.0 : SimulatorRunloopPeriod;
+
+	std::vector<double> S_NowState = { LastFPt.S, LastSpeed.S, LastAccel.S };
+	std::vector<double> D_NowState = { LastFPt.D, LastSpeed.D, LastAccel.D };
+
+	std::vector<double> S_EndState = { DestFPt.S, TargetSpeed.S, TargetAccel.S };
+	std::vector<double> D_EndState = { DestFPt.D, TargetSpeed.D, TargetAccel.D };
+
+	JMT Jerk = JMT(S_NowState, D_NowState, S_EndState, D_EndState, T);
+	FrenetPoint lFPt;
+	FrenetDescriptors lFDPt;
+	std::vector<FrenetDescriptors> FPath;
+
+	for (double t = PathStartTime; t <= T; t += SimulatorRunloopPeriod)
+	{
+		//lFPt = Jerk.JMTDisplacementAt(t);
+		lFDPt = Jerk.JMTFrenetDescriptorsAt(t);
+		FPath.push_back(lFDPt);
+	}
+	return FPath;
+}
+
 
 void Trajectory::LogCPath(std::vector<CartesianPoint> CPath)
 {
@@ -141,84 +188,75 @@ std::vector<CartesianPoint> Trajectory::InitiateTrajectory(PathPlannerInput inpu
 	FrenetPoint EndFPt = { LastFPt.S + Displacement, LastFPt.D };//move forward before moving sideways
 	
 	//generate frenet curve starting at the current location of the car
-	std::vector<FrenetPoint> StartupFPath = GenerateJMTPath(LastFPt, EndFPt, StartSpeed, LastSpeed, T, true);
-	// attempt to adjust for any effects of road curvature on speed while switching from frenet to cartesian
-	std::vector<CartesianPoint> CPath = map2.ConvertCurveMaintainSpeed(StartupFPath, LastCPt, false);
+	//std::vector<FrenetPoint> StartupFPath = GenerateJMTPath(LastFPt, EndFPt, StartSpeed, LastSpeed, T, true);
+	std::vector<FrenetDescriptors> StartupFDPath = GenerateJMTDPath(LastFPt, EndFPt, StartSpeed, LastSpeed, T, true);
+	PathPoint lPPt;
+	std::vector<CartesianPoint> lCPts;
+	CartesianPoint Offset = GetOffset(map2.FrenetToCartesian(LastFPt), LastCPt);
+	int pathsize;
+	for (FrenetDescriptors lFDPt : StartupFDPath)
+	{
+		lPPt.FDPt = lFDPt;
+		lPPt.CPt = map2.FrenetToCartesian(lFDPt.Displacement);
+//		lPPt.CPt.X -= Offset.X;
+//		lPPt.CPt.Y -= Offset.Y;
+		pathsize = BuiltPath.AddPathPoint(lPPt);
+	}
+	std::vector<CartesianPoint> CPath = BuiltPath.GetCPath();
+//	// attempt to adjust for any effects of road curvature on speed while switching from frenet to cartesian
+//	std::vector<CartesianPoint> CPath = map2.ConvertCurveMaintainSpeed(StartupFPath, LastCPt, false);
 	//adjust for any discrepancy between the known and calculated location of the path.
-	OffsetPath(CPath, LastCPt);
+//	OffsetPath(CPath, LastCPt);
 
 	_logger2->info("Checking Initialization Path.");
 	Acc_Jerk PathTest = CheckPath(CPath, SimulatorRunloopPeriod, input.SpeedMpS);
 
-	LogCPath(CPath);
+    LogCPath(CPath);
 	return CPath;
 }
-
 //
 // build a trajectory to remain in the lane and move to the center
 // can decide to truncate existing path down to 10 points (useful for emergency braking or diversions,
 // or just append to current path
-std::vector<CartesianPoint> Trajectory::GenerateKeepInLaneTrajectory( PathPlannerInput input, double DesiredVelocity, bool Truncate)
+std::vector<CartesianPoint> Trajectory::GenerateKeepInLaneTrajectory(PathPlannerInput input, double DesiredVelocity, bool Truncate)
 {
+	//Truncate = true;
+	//write out first points in input.path -here
 	std::vector<FrenetPoint> FPath;
 	std::vector<CartesianPoint> OutputPath, CPath;
 	double Displacement, T;
-	CartesianPoint EndCPt, PrevCPt;
+	CartesianPoint EndCPt, PrevCPt, Offset;
 	FrenetPoint EndFPt, NewEndFPt, EndFSpeed, TargetFSpeed, EndFAccel, TargetFAccel;
 
-	_logger2->info("Trajectory: In GenerateKeepInLaneTrajectory: Truncate = {}.",Truncate);
+	int PathSize = input.Path.size();
+	int DequeSize = BuiltPath.size();
+	DequeSize = BuiltPath.TrimPathDequeAtStart(DequeSize - PathSize);
 
-	//Should only have to deal with situations where there is already a path,
-	// but put code in place to deal with empty path - probably simulator blowup at that point anyway!
-	if( input.Path.size() > 0)
+	if (Truncate)
 	{
-		OutputPath = Truncate ? TrimPath(input.Path) : input.Path;
-		EndCPt = OutputPath.back();
-		if (OutputPath.size() == 1)
-		{
-			PrevCPt = input.LocationCartesian;
-		}
-		else
-		{
-			PrevCPt = OutputPath.at(OutputPath.size() - 2);
-		}
-		EndFPt = Truncate ? map2.CartesianToFrenet(EndCPt): input.PathEndpointFrenet;
+		DequeSize = BuiltPath.TrimPathDequeAtEnd(DequeSize - 11);  //cut to 10 points plus the current location
+
+		Offset = GetOffset(map2.FrenetToCartesian(input.LocationFrenet), input.LocationCartesian);
 	}
 	else
 	{
-		EndCPt = input.LocationCartesian;
-		double SpeedMpS = fabs(input.SpeedMpS) < 0.1 ? 1.0 : input.SpeedMpS;
-		PrevCPt = { input.LocationCartesian.X - SimulatorRunloopPeriod * SpeedMpS * cos(input.LocationCartesian.ThetaRads),
-					input.LocationCartesian.Y - SimulatorRunloopPeriod * SpeedMpS * sin(input.LocationCartesian.ThetaRads) };
-		EndFPt = input.LocationFrenet;
+		Offset = GetOffset(map2.FrenetToCartesian(input.PathEndpointFrenet), input.Path.back());
 	}
-	EndCPt.ThetaRads = atan2(EndCPt.Y - PrevCPt.Y, EndCPt.X - PrevCPt.X);
-	
-	//T is time to complete maneuver - make a longer Path if truncating existing path.
-	T = Truncate? 2.0: 1.0;
+
+	FrenetDescriptors lFDPt = BuiltPath.GetFrenetDescriptorsAt(DequeSize - 1);
+	FrenetDescriptors lFDPt1 = BuiltPath.GetFrenetDescriptorsAt(DequeSize - 2);
+	EndFPt = lFDPt.Displacement;
+//	EndFSpeed = lFDPt.Velocity;
+	EndFSpeed = {(lFDPt.Displacement.S - lFDPt1.Displacement.S) / 0.02, (lFDPt.Displacement.D - lFDPt1.Displacement.D) / 0.02 };
+	EndFAccel = lFDPt.Acceleration;
+
+	T = Truncate ? 2.0 : 1.0;
 	TargetFSpeed = { DesiredVelocity, 0.0 };
-	
-	if (OutputPath.size() == 0)
-	{
-		EndFSpeed.S = input.SpeedMpS;
-	}else{
-		EndFSpeed.S = (1 / SimulatorRunloopPeriod) * sqrt(pow(EndCPt.X - PrevCPt.X, 2.0) + pow(EndCPt.Y - PrevCPt.Y, 2.0));
-		EndFSpeed.D = 0.0;  //need to fix these up to get proper S and D speeds
-	}
-	//calculate acceleration at end of path
-	if (OutputPath.size() > 2)
-	{
-		EndFAccel = GetFinalFAccel(OutputPath);
-	}
-	else
-	{
-		EndFAccel = { 0.0, 0.0 };
-	}
-	
+
 	Acceleration = GetSafeAcceleration((TargetFSpeed.S - EndFSpeed.S) / T);
 	TargetFSpeed.S = EndFSpeed.S + (T * Acceleration);
 	Displacement = EndFSpeed.S * T + 0.5 * Acceleration * pow(T, 2.0);
-	if (TargetFSpeed.S < (DesiredVelocity * 0.95))
+	if (TargetFSpeed.S < (DesiredVelocity * 0.90))
 	{
 		TargetFAccel = { Acceleration, 0.0 };
 	}
@@ -232,18 +270,39 @@ std::vector<CartesianPoint> Trajectory::GenerateKeepInLaneTrajectory( PathPlanne
 	_logger2->info("Trajectory: TargetFSpeed of {:3.3f} calculated from startspeed of {:3.3f} with Safe Acceleration of {:+3.3f} giving Displacement of {:2.3f} m. for StayInLanePath",
 		TargetFSpeed.S, EndFSpeed.S, Acceleration, Displacement);
 
+	std::vector<FrenetDescriptors> FDPath;
 	bool ValidPath = false;
 	int ReCalcCounter = 0;
 	while (!ValidPath)
 	{
-		FPath.clear();
-		FPath = GenerateJMTPath(EndFPt, NewEndFPt, EndFSpeed, TargetFSpeed, T, true, EndFAccel, TargetFAccel);
-		CPath = map2.ConvertCurveMaintainSpeed(FPath, EndCPt, false);
+		FDPath.clear();
+		if (ReCalcCounter > 0 )
+		{
+			if (Truncate)
+			{
+				DequeSize = BuiltPath.TrimPathDequeAtEnd(DequeSize - 11);  //cut to 10 points plus the current location
+			}
+			else
+			{
+				DequeSize = BuiltPath.TrimPathDequeAtEnd(DequeSize - PathSize);
+			}
+		}
+
+		FDPath = GenerateJMTDPath(EndFPt, NewEndFPt, EndFSpeed, TargetFSpeed, T, false, EndFAccel, TargetFAccel);
+		PathPoint lPPt;
+		std::vector<CartesianPoint> lCPts;
+		for (FrenetDescriptors lFDPt : FDPath)
+		{
+			lPPt.FDPt = lFDPt;
+			lPPt.CPt = map2.FrenetToCartesian(lFDPt.Displacement);
+			DequeSize = BuiltPath.AddPathPoint(lPPt);
+		}
+		CPath = BuiltPath.GetCPath();
 
 		Acc_Jerk PathTest = CheckPath(CPath, SimulatorRunloopPeriod, EndFSpeed.S);
-		_logger2->info("Check Path ReCalcCounter={ } finds Maximum Velocity ={:3.3f} while MaxSpeedMPS is {:3.3f} Acceleration Maximum = {:+3.3f} while design Acceleration was {:+2.3f} ",
+		_logger2->info("Check Path ReCalcCounter={} finds Maximum Velocity ={:3.3f} while MaxSpeedMPS is {:3.3f} Acceleration Maximum = {:+3.3f} while design Acceleration was {:+2.3f} ",
 			ReCalcCounter, PathTest.Max_Vel, MaxSpeedMpS, PathTest.Max_Total_Acc, Acceleration);
-		
+
 		if ((PathTest.Max_Vel > MaxSpeedMpS) and (Acceleration > -1.0))
 		{
 			ReCalcCounter++;
@@ -270,42 +329,20 @@ std::vector<CartesianPoint> Trajectory::GenerateKeepInLaneTrajectory( PathPlanne
 				CPath.clear();
 			}
 		}
-		else if (PathTest.Max_Total_Acc < -5.0)
+		else
 		{
-			ReCalcCounter++;
-			if (ReCalcCounter > 3)
-			{
-				ValidPath = true;
-			}else{
-				_logger2->warn("Recalculating StayInLanePath because Acceleration of {} exceeds Max Acceleration of {} mps^2. Dumping Path for debug:",
-					PathTest.Max_Total_Acc, MaxBrakingAccelerationMpSsq);
-				LogCPath(CPath); 
-				Acceleration = MaxBrakingAccelerationMpSsq;
-				TargetFSpeed.S = EndFSpeed.S + (T * Acceleration);
-				if (TargetFSpeed.S < 0.0)
-				{
-					TargetFSpeed.S = 0.0;
-					Acceleration = GetSafeAcceleration(EndFSpeed.S / 2.0 / T);
-				}
-				Displacement = EndFSpeed.S * T + 0.5 * Acceleration * pow(T, 2.0);
-				NewEndFPt.S = EndFPt.S + Displacement;
-				_logger2->warn("TargetFSpeed of {:3.3f} calculated with Safe Acceleration of {:+3.3f} giving Displacement of {:3.3f} m.", TargetFSpeed.S, Acceleration, Displacement);
-				CPath.clear();
-			}
-		}else{
 			ValidPath = true;
 		}
 	}
-	OffsetPath(CPath, EndCPt);
-	
-	if (OutputPath.size() > 0)
-	{
-		OutputPath.insert(OutputPath.end(), CPath.begin()+1, CPath.end());
-	}
-	LogCPath(OutputPath);
 
-	return OutputPath;
+	
+	//CPath.erase(CPath.begin());
+	
+	LogCPath(CPath);
+
+	return CPath;
 }
+
 
 //
 // build a trajectory to move 1 lane to the left or right
@@ -313,12 +350,12 @@ std::vector<CartesianPoint> Trajectory::GenerateKeepInLaneTrajectory( PathPlanne
 // or just append to current path
 std::vector<CartesianPoint> Trajectory::GenerateJMTLaneChangeTrajectory(PathPlannerInput input, int TargetLane, double DesiredVelocity, bool Truncate)
 {
-	std::vector<FrenetPoint> FPath;
+	std::vector<FrenetPoint> FPath, FPathRunout;
 	std::vector<CartesianPoint> OutputPath, CPath;
-	double LaneChangeFactor,SDisplacement, Acceleration, T;
+	double LaneChangeFactor, SDisplacement, Acceleration, T;
 	CartesianPoint EndCPt, PrevCPt;
 	int CurrentLane;
-	FrenetPoint EndFPt, NewEndFPt, EndSpeed, TargetSpeed;
+	FrenetPoint EndFPt, NewEndFPt, EndFSpeed, TargetFSpeed, EndFAccel, TargetFAccel;
 	
 	assert(-1 < TargetLane < 3); // Make sure in range
 	CurrentLane = input.LocationFrenet.GetLane();
@@ -327,118 +364,109 @@ std::vector<CartesianPoint> Trajectory::GenerateJMTLaneChangeTrajectory(PathPlan
 
 	_logger2->info("In GenerateJMTLaneChangeTrajectory");
 
-	//Should only have to deal with situations where there is already a path,
-	// but put code in place to deal with empty path - probably simulator blowup at that point anyway!
-	if (input.Path.size() > 0)
-	{
-		OutputPath = Truncate ? TrimPath(input.Path) : input.Path;
-		EndCPt = OutputPath.back();
-		if (OutputPath.size() == 1)
-		{
-			PrevCPt = input.LocationCartesian;
-		}
-		else
-		{
-			PrevCPt = OutputPath.at(OutputPath.size() - 2);
-		}
-		EndFPt = Truncate ? map2.CartesianToFrenet(EndCPt) : input.PathEndpointFrenet;
-	}
-	else
-	{
-		EndCPt = input.LocationCartesian;
-		double SpeedMpS = fabs(input.SpeedMpS) < 0.1 ? 1.0 : input.SpeedMpS;
-		PrevCPt = { input.LocationCartesian.X - SimulatorRunloopPeriod * SpeedMpS * cos(input.LocationCartesian.ThetaRads),
-			input.LocationCartesian.Y - SimulatorRunloopPeriod * SpeedMpS * sin(input.LocationCartesian.ThetaRads) };
-		EndFPt = input.LocationFrenet;
-	}
-	EndCPt.ThetaRads = atan2(EndCPt.Y - PrevCPt.Y, EndCPt.X - PrevCPt.X);
+	int PathSize = input.Path.size();
+	int DequeSize = BuiltPath.size();
+	DequeSize = BuiltPath.TrimPathDequeAtStart(DequeSize - PathSize);
 
-	//T is time to complete maneuver 
+	if (Truncate)
+	{
+		DequeSize = BuiltPath.TrimPathDequeAtEnd(DequeSize - 11);  //cut to 10 points plus the current location
+
+	//	Offset = GetOffset(map2.FrenetToCartesian(input.LocationFrenet), input.LocationCartesian);
+	}
+	//else
+	//{
+	//	Offset = GetOffset(map2.FrenetToCartesian(input.PathEndpointFrenet), input.Path.back());
+	//}
+
 	T = 1.7;
-	TargetSpeed = { DesiredVelocity, 0.0 };
+	FrenetDescriptors lFDPt = BuiltPath.GetFrenetDescriptorsAt(DequeSize - 1);
+	FrenetDescriptors lFDPt1 = BuiltPath.GetFrenetDescriptorsAt(DequeSize - 2);
+	EndFPt = lFDPt.Displacement;
+	EndFSpeed = { (lFDPt.Displacement.S - lFDPt1.Displacement.S) / 0.02, (lFDPt.Displacement.D - lFDPt1.Displacement.D) / 0.02 };
+	EndFAccel = lFDPt.Acceleration;
 
-	if (OutputPath.size() == 0)
+	TargetFSpeed = { DesiredVelocity, 0.0 };
+
+	Acceleration = GetSafeAcceleration((TargetFSpeed.S - EndFSpeed.S) / T);
+	TargetFSpeed.S = EndFSpeed.S + (T * Acceleration);
+	LaneChangeFactor = ((EndFSpeed.S + TargetFSpeed.S) / 2.0 * T) / sqrt(pow(T*(TargetFSpeed.S + EndFSpeed.S) / 2.0, 2.0) + pow(3.9, 2.0));
+	SDisplacement = (EndFSpeed.S + TargetFSpeed.S) / 2.0 * T * LaneChangeFactor;
+	if (TargetFSpeed.S < DesiredVelocity and abs(TargetFSpeed.S - DesiredVelocity)/DesiredVelocity < 0.1 )
 	{
-		EndSpeed.S = input.SpeedMpS;
+		TargetFAccel = { Acceleration, 0.0 };
 	}
 	else
 	{
-		EndSpeed.S = (1 / SimulatorRunloopPeriod) * sqrt(pow(EndCPt.X - PrevCPt.X, 2.0) + pow(EndCPt.Y - PrevCPt.Y, 2.0));
-		EndSpeed.D = 0.0;  //need to fix these up to get proper S and D speeds
+		TargetFAccel = { 0.0, 0.0 };
 	}
-	Acceleration = GetSafeAcceleration((TargetSpeed.S - EndSpeed.S) / T);
-	TargetSpeed.S = EndSpeed.S + (T * Acceleration);
-//	Displacement = EndFSpeed.S * T + 0.5 * Acceleration * pow(T, 2.0);
-	LaneChangeFactor = ((EndSpeed.S + TargetSpeed.S) / 2.0 * T) / sqrt(pow(T*(TargetSpeed.S + EndSpeed.S) / 2.0, 2.0) + pow(3.9, 2.0));
-	SDisplacement = (EndSpeed.S + TargetSpeed.S) / 2.0 * T * LaneChangeFactor;
 
 	NewEndFPt = { EndFPt.S + SDisplacement, FrenetPoint::LaneCenterDCoord(TargetLane) };
 
-	_logger2->info("TargetFSpeed of {:3.3f} calculated with Safe Acceleration of {:+3.3f} giving Displacement of {:2.3f} m. for LaneChangePath",
-		TargetSpeed.S, Acceleration, SDisplacement);
+	_logger2->info("Trajectory: TargetFSpeed of {:3.3f} calculated from startspeed of {:3.3f} with Safe Acceleration of {:+3.3f} giving Displacement of {:2.3f} m. for LaneChange Trajectory",
+		TargetFSpeed.S, EndFSpeed.S, Acceleration, SDisplacement);
+
+
+
+	std::vector<FrenetDescriptors> FDPath;
 
 	bool ValidPath = false;
 	int ReCalcCounter = 0;
 	while (!ValidPath)
 	{
-		FPath.clear();
-		FPath = GenerateJMTPath(EndFPt, NewEndFPt, EndSpeed, TargetSpeed, T, true);
-		CPath = map2.ConvertCurveMaintainSpeed(FPath, EndCPt, false);
+		FDPath.clear();
+		if (ReCalcCounter > 0)
+		{
+			if (Truncate)
+			{
+				DequeSize = BuiltPath.TrimPathDequeAtEnd(DequeSize - 11);  //cut to 10 points plus the current location
+			}
+			else
+			{
+				DequeSize = BuiltPath.TrimPathDequeAtEnd(DequeSize - PathSize);
+			}
+		}
 
-		Acc_Jerk PathTest = CheckPath(CPath, SimulatorRunloopPeriod, EndSpeed.S);
+		FDPath = GenerateJMTDPath(EndFPt, NewEndFPt, EndFSpeed, TargetFSpeed, T, false, EndFAccel, TargetFAccel);
+		PathPoint lPPt;
+		std::vector<CartesianPoint> lCPts;
+		for (FrenetDescriptors lFDPt : FDPath)
+		{
+			lPPt.FDPt = lFDPt;
+			lPPt.CPt = map2.FrenetToCartesian(lFDPt.Displacement);
+			//lPPt.CPt.X -= Offset.X;
+			//lPPt.CPt.Y -= Offset.Y;
+			DequeSize = BuiltPath.AddPathPoint(lPPt);
+		}
+		CPath = BuiltPath.GetCPath();
+
+		Acc_Jerk PathTest = CheckPath(CPath, SimulatorRunloopPeriod, EndFSpeed.S);
 		_logger2->info("Check Path ReCalcCounter={} finds Maximum Velocity ={:3.3f} while MaxSpeedMPS is {:3.3f} Acceleration Maximum = {:+3.3f} while design Acceleration was {:+2.3f} ",
 			ReCalcCounter, PathTest.Max_Vel, MaxSpeedMpS, PathTest.Max_Total_Acc, Acceleration);
 
 		if ((PathTest.Max_Vel > MaxSpeedMpS) and (Acceleration > -1.0))
 		{
-			ReCalcCounter++;
+			// for now just set to zero.
+			TargetFAccel = { 0.0, 0.0 };
 			if (ReCalcCounter > 3)
 			{
-				_logger2->warn("Could not get path to meet specs, using last set.");
+				_logger2->warn("Trajectory: Could not get path to meet specs, using last set.");
 				ValidPath = true;  //give up. - maybe it will work!
 			}
 			else
 			{
-
-				_logger2->warn("Recalculating StayInLanePath because Max_Vel of {} exceeds Max velocity of {} mps. Dumping Path for debug:",
+				ReCalcCounter++;
+				_logger2->warn("Recalculating Change Lane Trajectory because Max_Vel of {} exceeds Max velocity of {} mps. Dumping Path for debug:",
 					PathTest.Max_Vel, MaxSpeedMpS);
 				LogCPath(CPath);
 				double vel_diff = PathTest.Max_Vel - MaxSpeedMpS > 1.0 ? (PathTest.Max_Vel - MaxSpeedMpS)*1.5 : 1.0;
-				TargetSpeed.S -= vel_diff;// (PathTest.Max_Vel - targetSpeed + 0.1);
-				Acceleration = GetSafeAcceleration((TargetSpeed.S - EndSpeed.S) / T);
-				TargetSpeed.S = EndSpeed.S + (T * Acceleration);
-				LaneChangeFactor = ((EndSpeed.S + TargetSpeed.S) / 2.0 * T) / sqrt(pow(T*(TargetSpeed.S + EndSpeed.S) / 2.0, 2.0) + pow(3.9, 2.0));
-				SDisplacement = (EndSpeed.S + TargetSpeed.S) / 2.0 * T * LaneChangeFactor; 
+				TargetFSpeed.S -= vel_diff;// (PathTest.Max_Vel - targetSpeed + 0.1);
+				Acceleration = GetSafeAcceleration((TargetFSpeed.S - EndFSpeed.S) / T);
+				TargetFSpeed.S = EndFSpeed.S + (T * Acceleration);
+				LaneChangeFactor = ((EndFSpeed.S + TargetFSpeed.S) / 2.0 * T) / sqrt(pow(T*(TargetFSpeed.S + EndFSpeed.S) / 2.0, 2.0) + pow(3.9, 2.0));
+				SDisplacement = (EndFSpeed.S + TargetFSpeed.S) / 2.0 * T * LaneChangeFactor; 
 				NewEndFPt.S = EndFPt.S + SDisplacement;
-				_logger2->warn("TargetFSpeed of {:3.3f} calculated with Safe Acceleration of {:+3.3f} giving Displacement of {:3.3f} m.", TargetSpeed.S, Acceleration, SDisplacement);
-				CPath.clear();
-			}
-		}
-		else if (PathTest.Max_Total_Acc < -5.0)
-		{
-			ReCalcCounter++;
-			if (ReCalcCounter > 3)
-			{
-				ValidPath = true;
-			}
-			else
-			{
-				_logger2->warn("Recalculating StayInLanePath because Acceleration of {} exceeds Max Acceleration of {} mps^2. Dumping Path for debug:",
-					PathTest.Max_Total_Acc, MaxBrakingAccelerationMpSsq);
-				LogCPath(CPath);
-				Acceleration = MaxBrakingAccelerationMpSsq;
-				TargetSpeed.S = EndSpeed.S + (T * Acceleration);
-				if (TargetSpeed.S < 0.0)
-				{
-					TargetSpeed.S = 0.1;
-					Acceleration = GetSafeAcceleration((EndSpeed.S+TargetSpeed.S)/ 2.0 / T);
-				}
-				LaneChangeFactor = ((EndSpeed.S + TargetSpeed.S) / 2.0 * T) / sqrt(pow(T*(TargetSpeed.S + EndSpeed.S) / 2.0, 2.0) + pow(3.9, 2.0));
-				SDisplacement = (EndSpeed.S + TargetSpeed.S) / 2.0 * T * LaneChangeFactor;
-				//SDisplacement = EndFSpeed.S * T + 0.5 * Acceleration * pow(T, 2.0);
-				NewEndFPt.S = EndFPt.S + SDisplacement;
-				_logger2->warn("TargetFSpeed of {:3.3f} calculated with Safe Acceleration of {:+3.3f} giving Displacement of {:3.3f} m.", 
-					TargetSpeed.S, Acceleration, SDisplacement);
+				_logger2->warn("TargetFSpeed of {:3.3f} calculated with Safe Acceleration of {:+3.3f} giving Displacement of {:3.3f} m.", TargetFSpeed.S, Acceleration, SDisplacement);
 				CPath.clear();
 			}
 		}
@@ -451,28 +479,59 @@ std::vector<CartesianPoint> Trajectory::GenerateJMTLaneChangeTrajectory(PathPlan
 	///////////////////////////////
 	// Add path along lane going straight so lane change does not need to be recalcuated due to short path. 
 
-	T = 1.0;
-	CartesianPoint LastCPt = CPath.back();
-	FrenetPoint CurveEndFPt = FPath.back();
-	FrenetPoint RunoutEndFPt = { CurveEndFPt.S + TargetSpeed.S * T, CurveEndFPt.D };
-	FPath.clear();
-	FPath = GenerateJMTPath(CurveEndFPt, RunoutEndFPt, TargetSpeed, TargetSpeed, T, true);
-	std::vector<CartesianPoint> AddOnCPath = map2.ConvertCurveMaintainSpeed(FPath, LastCPt, false);
-	OffsetPath(AddOnCPath, LastCPt);
+	//T = 1.0;
+	//DequeSize = BuiltPath.size();
+	//lFDPt = BuiltPath.GetFrenetDescriptorsAt(DequeSize - 1);
+	//lFDPt1 = BuiltPath.GetFrenetDescriptorsAt(DequeSize - 2);
+	//EndFPt = lFDPt.Displacement;
+	//EndFSpeed = { (lFDPt.Displacement.S - lFDPt1.Displacement.S) / 0.02, (lFDPt.Displacement.D - lFDPt1.Displacement.D) / 0.02 };
+	//EndFAccel = lFDPt.Acceleration;
+	//TargetFSpeed = { DesiredVelocity, 0.0 };
+	//Acceleration = GetSafeAcceleration((TargetFSpeed.S - EndFSpeed.S) / T);
+	//TargetFSpeed.S = EndFSpeed.S + (T * Acceleration);
+	//SDisplacement = (EndFSpeed.S + TargetFSpeed.S) / 2.0 * T;
+	//if (TargetFSpeed.S < DesiredVelocity and abs(TargetFSpeed.S - DesiredVelocity) / DesiredVelocity < 0.1)
+	//{
+	//	TargetFAccel = { Acceleration, 0.0 };
+	//}
+	//else
+	//{
+	//	TargetFAccel = { 0.0, 0.0 };
+	//}
+	//NewEndFPt = { EndFPt.S + SDisplacement, FrenetPoint::LaneCenterDCoord(TargetLane) };
+	//FDPath = GenerateJMTDPath(EndFPt, NewEndFPt, EndFSpeed, TargetFSpeed, T, false, EndFAccel, TargetFAccel);
+	//PathPoint lPPt;
+	//std::vector<CartesianPoint> lCPts;
+	//for (int i = 0; i< 30; i++)
+	//{
+	//	FrenetDescriptors lFDPt = FDPath.at(i);
+	//	lPPt.FDPt = lFDPt;
+	//	lPPt.CPt = map2.FrenetToCartesian(lFDPt.Displacement);
+	//	DequeSize = BuiltPath.AddPathPoint(lPPt);
+	//}
+	//CPath = BuiltPath.GetCPath();
+
+//	CartesianPoint LastCPt = CPath.back();
+//	FrenetPoint CurveEndFPt = FPath.back();
+//	FrenetPoint RunoutEndFPt = { CurveEndFPt.S + TargetSpeed.S * T, CurveEndFPt.D };
+//	FPath.clear();
+//	FPath = GenerateJMTPath(CurveEndFPt, RunoutEndFPt, TargetSpeed, TargetSpeed, T, true);
+//	std::vector<CartesianPoint> AddOnCPath = map2.ConvertCurveMaintainSpeed(FPath, LastCPt, false);
+//	OffsetPath(AddOnCPath, LastCPt);
 	//only want 30 points down lane
-	CPath.insert(CPath.end(), AddOnCPath.begin()+1, AddOnCPath.begin()+30);
+//	CPath.insert(CPath.end(), AddOnCPath.begin()+1, AddOnCPath.begin()+30);
 	
-	_logger2->info("Checking Final Lane Change Path.");
-	Acc_Jerk PathTest = CheckPath(CPath, SimulatorRunloopPeriod, input.SpeedMpS);
-	_logger2->info("Check Final LaneChange Path finds Maximum Velocity ={:3.3f} while MaxSpeedMPS is {:3.3f} Acceleration Maximum = {:+3.3f} while design Acceleration was {:+2.3f} ",
-		 PathTest.Max_Vel, MaxSpeedMpS, PathTest.Max_Total_Acc, Acceleration);
+//	_logger2->info("Checking Final Lane Change Path.");
+//	Acc_Jerk PathTest = CheckPath(CPath, SimulatorRunloopPeriod, input.SpeedMpS);
+//	_logger2->info("Check Final LaneChange Path finds Maximum Velocity ={:3.3f} while MaxSpeedMPS is {:3.3f} Acceleration Maximum = {:+3.3f} while design Acceleration was {:+2.3f} ",
+//		 PathTest.Max_Vel, MaxSpeedMpS, PathTest.Max_Total_Acc, Acceleration);
 	
-	OffsetPath(CPath, EndCPt);
-	OutputPath.insert(OutputPath.end(), CPath.begin()+1, CPath.end());
+//	OffsetPath(CPath, EndCPt);
+//	OutputPath.insert(OutputPath.end(), CPath.begin()+1, CPath.end());
 	
-	LogCPath(OutputPath);
+	LogCPath(CPath);
 	
-	return OutputPath;
+	return CPath;
 }
 
 Acc_Jerk Trajectory::CheckPath(std::vector<CartesianPoint> Path, double time_increment, double v_init, double a_init)
@@ -529,4 +588,336 @@ Acc_Jerk Trajectory::CheckPath(std::vector<CartesianPoint> Path, double time_inc
 	}
 	_logger2->info("Max step Velocity = {}, Max Segment Acceleration = {}", Path_Characteristics.Max_Vel, Path_Characteristics.Max_Total_Acc);
 	return(Path_Characteristics);
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// build a trajectory to remain in the lane and move to the center
+// can decide to truncate existing path down to 10 points (useful for emergency braking or diversions,
+// or just append to current path
+std::vector<CartesianPoint> Trajectory::OldGenerateKeepInLaneTrajectory(PathPlannerInput input, double DesiredVelocity, bool Truncate)
+{
+	std::vector<FrenetPoint> FPath;
+	std::vector<CartesianPoint> OutputPath, CPath;
+	double Displacement, T;
+	CartesianPoint EndCPt, PrevCPt;
+	FrenetPoint EndFPt, NewEndFPt, EndFSpeed, TargetFSpeed, EndFAccel, TargetFAccel;
+
+	_logger2->info("Trajectory: In GenerateKeepInLaneTrajectory: Truncate = {}.", Truncate);
+
+	//Should only have to deal with situations where there is already a path,
+	// but put code in place to deal with empty path - probably simulator blowup at that point anyway!
+	if (input.Path.size() > 0)
+	{
+		OutputPath = Truncate ? TrimPath(input.Path) : input.Path;
+		EndCPt = OutputPath.back();
+		if (OutputPath.size() == 1)
+		{
+			PrevCPt = input.LocationCartesian;
+		}
+		else
+		{
+			PrevCPt = OutputPath.at(OutputPath.size() - 2);
+		}
+		EndFPt = Truncate ? map2.CartesianToFrenet(EndCPt) : input.PathEndpointFrenet;
+	}
+	else
+	{
+		EndCPt = input.LocationCartesian;
+		double SpeedMpS = fabs(input.SpeedMpS) < 0.1 ? 1.0 : input.SpeedMpS;
+		PrevCPt = { input.LocationCartesian.X - SimulatorRunloopPeriod * SpeedMpS * cos(input.LocationCartesian.ThetaRads),
+			input.LocationCartesian.Y - SimulatorRunloopPeriod * SpeedMpS * sin(input.LocationCartesian.ThetaRads) };
+		EndFPt = input.LocationFrenet;
+	}
+	EndCPt.ThetaRads = atan2(EndCPt.Y - PrevCPt.Y, EndCPt.X - PrevCPt.X);
+
+	//T is time to complete maneuver - make a longer Path if truncating existing path.
+	T = Truncate ? 2.0 : 1.0;
+	TargetFSpeed = { DesiredVelocity, 0.0 };
+
+	if (OutputPath.size() == 0)
+	{
+		EndFSpeed.S = input.SpeedMpS;
+	}
+	else
+	{
+		EndFSpeed.S = (1 / SimulatorRunloopPeriod) * sqrt(pow(EndCPt.X - PrevCPt.X, 2.0) + pow(EndCPt.Y - PrevCPt.Y, 2.0));
+		EndFSpeed.D = 0.0;  //need to fix these up to get proper S and D speeds
+	}
+	//calculate acceleration at end of path
+	if (OutputPath.size() > 2)
+	{
+		EndFAccel = GetFinalFAccel(OutputPath);
+	}
+	else
+	{
+		EndFAccel = { 0.0, 0.0 };
+	}
+
+	Acceleration = GetSafeAcceleration((TargetFSpeed.S - EndFSpeed.S) / T);
+	TargetFSpeed.S = EndFSpeed.S + (T * Acceleration);
+	Displacement = EndFSpeed.S * T + 0.5 * Acceleration * pow(T, 2.0);
+	if (TargetFSpeed.S < (DesiredVelocity * 0.95))
+	{
+		TargetFAccel = { Acceleration, 0.0 };
+	}
+	else
+	{
+		TargetFAccel = { 0.0, 0.0 };
+	}
+
+	NewEndFPt = { EndFPt.S + Displacement, EndFPt.LaneCenterDCoord(EndFPt.GetLane()) };
+
+	_logger2->info("Trajectory: TargetFSpeed of {:3.3f} calculated from startspeed of {:3.3f} with Safe Acceleration of {:+3.3f} giving Displacement of {:2.3f} m. for StayInLanePath",
+		TargetFSpeed.S, EndFSpeed.S, Acceleration, Displacement);
+
+	bool ValidPath = false;
+	int ReCalcCounter = 0;
+	while (!ValidPath)
+	{
+		FPath.clear();
+		FPath = GenerateJMTPath(EndFPt, NewEndFPt, EndFSpeed, TargetFSpeed, T, true, EndFAccel, TargetFAccel);
+		CPath = map2.ConvertCurveMaintainSpeed(FPath, EndCPt, false);
+
+		Acc_Jerk PathTest = CheckPath(CPath, SimulatorRunloopPeriod, EndFSpeed.S);
+		_logger2->info("Check Path ReCalcCounter={} finds Maximum Velocity ={:3.3f} while MaxSpeedMPS is {:3.3f} Acceleration Maximum = {:+3.3f} while design Acceleration was {:+2.3f} ",
+			ReCalcCounter, PathTest.Max_Vel, MaxSpeedMpS, PathTest.Max_Total_Acc, Acceleration);
+
+		if ((PathTest.Max_Vel > MaxSpeedMpS) and (Acceleration > -1.0))
+		{
+			ReCalcCounter++;
+			// for now just set to zero.
+			TargetFAccel = { 0.0, 0.0 };
+			if (ReCalcCounter > 3)
+			{
+				_logger2->warn("Trajectory: Could not get path to meet specs, using last set.");
+				ValidPath = true;  //give up. - maybe it will work!
+			}
+			else
+			{
+
+				_logger2->warn("Recalculating StayInLanePath because Max_Vel of {} exceeds Max velocity of {} mps. Dumping Path for debug:",
+					PathTest.Max_Vel, MaxSpeedMpS);
+				LogCPath(CPath);
+				double vel_diff = PathTest.Max_Vel - MaxSpeedMpS > 1.0 ? (PathTest.Max_Vel - MaxSpeedMpS)*1.5 : 1.0;
+				TargetFSpeed.S -= vel_diff;// (PathTest.Max_Vel - targetSpeed + 0.1);
+				Acceleration = GetSafeAcceleration((TargetFSpeed.S - EndFSpeed.S) / T);
+				TargetFSpeed.S = EndFSpeed.S + (T * Acceleration);
+				Displacement = EndFSpeed.S * T + 0.5 * Acceleration * pow(T, 2.0);
+				NewEndFPt.S = EndFPt.S + Displacement;
+				_logger2->warn("TargetFSpeed of {:3.3f} calculated with Safe Acceleration of {:+3.3f} giving Displacement of {:3.3f} m.", TargetFSpeed.S, Acceleration, Displacement);
+				CPath.clear();
+			}
+		}
+		else if (PathTest.Max_Total_Acc < -5.0)
+		{
+			ReCalcCounter++;
+			if (ReCalcCounter > 3)
+			{
+				ValidPath = true;
+			}
+			else
+			{
+				_logger2->warn("Recalculating StayInLanePath because Acceleration of {} exceeds Max Acceleration of {} mps^2. Dumping Path for debug:",
+					PathTest.Max_Total_Acc, MaxBrakingAccelerationMpSsq);
+				LogCPath(CPath);
+				Acceleration = MaxBrakingAccelerationMpSsq;
+				TargetFSpeed.S = EndFSpeed.S + (T * Acceleration);
+				if (TargetFSpeed.S < 0.0)
+				{
+					TargetFSpeed.S = 0.0;
+					Acceleration = GetSafeAcceleration(EndFSpeed.S / 2.0 / T);
+				}
+				Displacement = EndFSpeed.S * T + 0.5 * Acceleration * pow(T, 2.0);
+				NewEndFPt.S = EndFPt.S + Displacement;
+				_logger2->warn("TargetFSpeed of {:3.3f} calculated with Safe Acceleration of {:+3.3f} giving Displacement of {:3.3f} m.", TargetFSpeed.S, Acceleration, Displacement);
+				CPath.clear();
+			}
+		}
+		else
+		{
+			ValidPath = true;
+		}
+	}
+	OffsetPath(CPath, EndCPt);
+
+	if (OutputPath.size() > 0)
+	{
+		OutputPath.insert(OutputPath.end(), CPath.begin() + 1, CPath.end());
+	}
+	LogCPath(OutputPath);
+
+	return OutputPath;
+}
+
+//
+// build a trajectory to move 1 lane to the left or right
+// can decide to truncate existing path down to 10 points (Lets change lanes now!),
+// or just append to current path
+std::vector<CartesianPoint> Trajectory::OldGenerateJMTLaneChangeTrajectory(PathPlannerInput input, int TargetLane, double DesiredVelocity, bool Truncate)
+{
+	std::vector<FrenetPoint> FPath, FPathRunout;
+	std::vector<CartesianPoint> OutputPath, CPath;
+	double LaneChangeFactor, SDisplacement, Acceleration, T;
+	CartesianPoint EndCPt, PrevCPt;
+	int CurrentLane;
+	FrenetPoint EndFPt, NewEndFPt, EndSpeed, TargetSpeed;
+
+	assert(-1 < TargetLane < 3); // Make sure in range
+	CurrentLane = input.LocationFrenet.GetLane();
+	int LanesChange = TargetLane - CurrentLane;
+	assert(abs(LanesChange) < 2);  // 1 lane at a time
+
+	_logger2->info("In GenerateJMTLaneChangeTrajectory");
+
+	//Should only have to deal with situations where there is already a path,
+	// but put code in place to deal with empty path - probably simulator blowup at that point anyway!
+	if (input.Path.size() > 0)
+	{
+		OutputPath = Truncate ? TrimPath(input.Path) : input.Path;
+		EndCPt = OutputPath.back();
+		if (OutputPath.size() == 1)
+		{
+			PrevCPt = input.LocationCartesian;
+		}
+		else
+		{
+			PrevCPt = OutputPath.at(OutputPath.size() - 2);
+		}
+		EndFPt = Truncate ? map2.CartesianToFrenet(EndCPt) : input.PathEndpointFrenet;
+	}
+	else
+	{
+		EndCPt = input.LocationCartesian;
+		double SpeedMpS = fabs(input.SpeedMpS) < 0.1 ? 1.0 : input.SpeedMpS;
+		PrevCPt = { input.LocationCartesian.X - SimulatorRunloopPeriod * SpeedMpS * cos(input.LocationCartesian.ThetaRads),
+			input.LocationCartesian.Y - SimulatorRunloopPeriod * SpeedMpS * sin(input.LocationCartesian.ThetaRads) };
+		EndFPt = input.LocationFrenet;
+	}
+	EndCPt.ThetaRads = atan2(EndCPt.Y - PrevCPt.Y, EndCPt.X - PrevCPt.X);
+
+	//T is time to complete maneuver 
+	T = 1.7;
+	TargetSpeed = { DesiredVelocity, 0.0 };
+
+	if (OutputPath.size() == 0)
+	{
+		EndSpeed.S = input.SpeedMpS;
+	}
+	else
+	{
+		EndSpeed.S = (1 / SimulatorRunloopPeriod) * sqrt(pow(EndCPt.X - PrevCPt.X, 2.0) + pow(EndCPt.Y - PrevCPt.Y, 2.0));
+		EndSpeed.D = 0.0;  //need to fix these up to get proper S and D speeds
+	}
+	Acceleration = GetSafeAcceleration((TargetSpeed.S - EndSpeed.S) / T);
+	TargetSpeed.S = EndSpeed.S + (T * Acceleration);
+	//	Displacement = EndFSpeed.S * T + 0.5 * Acceleration * pow(T, 2.0);
+	LaneChangeFactor = ((EndSpeed.S + TargetSpeed.S) / 2.0 * T) / sqrt(pow(T*(TargetSpeed.S + EndSpeed.S) / 2.0, 2.0) + pow(3.9, 2.0));
+	SDisplacement = (EndSpeed.S + TargetSpeed.S) / 2.0 * T * LaneChangeFactor;
+
+	NewEndFPt = { EndFPt.S + SDisplacement, FrenetPoint::LaneCenterDCoord(TargetLane) };
+
+	_logger2->info("TargetFSpeed of {:3.3f} calculated with Safe Acceleration of {:+3.3f} giving Displacement of {:2.3f} m. for LaneChangePath",
+		TargetSpeed.S, Acceleration, SDisplacement);
+
+	bool ValidPath = false;
+	int ReCalcCounter = 0;
+	while (!ValidPath)
+	{
+		FPath.clear();
+		FPath = GenerateJMTPath(EndFPt, NewEndFPt, EndSpeed, TargetSpeed, T, true);
+		//		T2 = 1.0;
+		//		FrenetPoint RunoutEndFPt = { NewEndFPt.S + TargetSpeed.S * T, NewEndFPt.D };
+		//		FPathRunout = GenerateJMTPath(CurveEndFPt, RunoutEndFPt, TargetSpeed, TargetSpeed, T, true);
+		CPath = map2.ConvertCurveMaintainSpeed(FPath, EndCPt, false);
+
+		Acc_Jerk PathTest = CheckPath(CPath, SimulatorRunloopPeriod, EndSpeed.S);
+		_logger2->info("Check Path ReCalcCounter={} finds Maximum Velocity ={:3.3f} while MaxSpeedMPS is {:3.3f} Acceleration Maximum = {:+3.3f} while design Acceleration was {:+2.3f} ",
+			ReCalcCounter, PathTest.Max_Vel, MaxSpeedMpS, PathTest.Max_Total_Acc, Acceleration);
+
+		if ((PathTest.Max_Vel > MaxSpeedMpS) and (Acceleration > -1.0))
+		{
+			ReCalcCounter++;
+			if (ReCalcCounter > 3)
+			{
+				_logger2->warn("Could not get path to meet specs, using last set.");
+				ValidPath = true;  //give up. - maybe it will work!
+			}
+			else
+			{
+
+				_logger2->warn("Recalculating StayInLanePath because Max_Vel of {} exceeds Max velocity of {} mps. Dumping Path for debug:",
+					PathTest.Max_Vel, MaxSpeedMpS);
+				LogCPath(CPath);
+				double vel_diff = PathTest.Max_Vel - MaxSpeedMpS > 1.0 ? (PathTest.Max_Vel - MaxSpeedMpS)*1.5 : 1.0;
+				TargetSpeed.S -= vel_diff;// (PathTest.Max_Vel - targetSpeed + 0.1);
+				Acceleration = GetSafeAcceleration((TargetSpeed.S - EndSpeed.S) / T);
+				TargetSpeed.S = EndSpeed.S + (T * Acceleration);
+				LaneChangeFactor = ((EndSpeed.S + TargetSpeed.S) / 2.0 * T) / sqrt(pow(T*(TargetSpeed.S + EndSpeed.S) / 2.0, 2.0) + pow(3.9, 2.0));
+				SDisplacement = (EndSpeed.S + TargetSpeed.S) / 2.0 * T * LaneChangeFactor;
+				NewEndFPt.S = EndFPt.S + SDisplacement;
+				_logger2->warn("TargetFSpeed of {:3.3f} calculated with Safe Acceleration of {:+3.3f} giving Displacement of {:3.3f} m.", TargetSpeed.S, Acceleration, SDisplacement);
+				CPath.clear();
+			}
+		}
+		else if (PathTest.Max_Total_Acc < -5.0)
+		{
+			ReCalcCounter++;
+			if (ReCalcCounter > 3)
+			{
+				ValidPath = true;
+			}
+			else
+			{
+				_logger2->warn("Recalculating StayInLanePath because Acceleration of {} exceeds Max Acceleration of {} mps^2. Dumping Path for debug:",
+					PathTest.Max_Total_Acc, MaxBrakingAccelerationMpSsq);
+				LogCPath(CPath);
+				Acceleration = MaxBrakingAccelerationMpSsq;
+				TargetSpeed.S = EndSpeed.S + (T * Acceleration);
+				if (TargetSpeed.S < 0.0)
+				{
+					TargetSpeed.S = 0.1;
+					Acceleration = GetSafeAcceleration((EndSpeed.S + TargetSpeed.S) / 2.0 / T);
+				}
+				LaneChangeFactor = ((EndSpeed.S + TargetSpeed.S) / 2.0 * T) / sqrt(pow(T*(TargetSpeed.S + EndSpeed.S) / 2.0, 2.0) + pow(3.9, 2.0));
+				SDisplacement = (EndSpeed.S + TargetSpeed.S) / 2.0 * T * LaneChangeFactor;
+				//SDisplacement = EndFSpeed.S * T + 0.5 * Acceleration * pow(T, 2.0);
+				NewEndFPt.S = EndFPt.S + SDisplacement;
+				_logger2->warn("TargetFSpeed of {:3.3f} calculated with Safe Acceleration of {:+3.3f} giving Displacement of {:3.3f} m.",
+					TargetSpeed.S, Acceleration, SDisplacement);
+				CPath.clear();
+			}
+		}
+		else
+		{
+			ValidPath = true;
+		}
+	}
+
+	///////////////////////////////
+	// Add path along lane going straight so lane change does not need to be recalcuated due to short path. 
+
+	T = 1.0;
+	CartesianPoint LastCPt = CPath.back();
+	FrenetPoint CurveEndFPt = FPath.back();
+	FrenetPoint RunoutEndFPt = { CurveEndFPt.S + TargetSpeed.S * T, CurveEndFPt.D };
+	FPath.clear();
+	FPath = GenerateJMTPath(CurveEndFPt, RunoutEndFPt, TargetSpeed, TargetSpeed, T, true);
+	std::vector<CartesianPoint> AddOnCPath = map2.ConvertCurveMaintainSpeed(FPath, LastCPt, false);
+	OffsetPath(AddOnCPath, LastCPt);
+	//only want 30 points down lane
+	CPath.insert(CPath.end(), AddOnCPath.begin() + 1, AddOnCPath.begin() + 30);
+
+	_logger2->info("Checking Final Lane Change Path.");
+	Acc_Jerk PathTest = CheckPath(CPath, SimulatorRunloopPeriod, input.SpeedMpS);
+	_logger2->info("Check Final LaneChange Path finds Maximum Velocity ={:3.3f} while MaxSpeedMPS is {:3.3f} Acceleration Maximum = {:+3.3f} while design Acceleration was {:+2.3f} ",
+		PathTest.Max_Vel, MaxSpeedMpS, PathTest.Max_Total_Acc, Acceleration);
+
+	OffsetPath(CPath, EndCPt);
+	OutputPath.insert(OutputPath.end(), CPath.begin() + 1, CPath.end());
+
+	LogCPath(OutputPath);
+
+	return OutputPath;
 }

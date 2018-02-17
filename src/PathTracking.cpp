@@ -13,14 +13,15 @@ PathTracking::PathTracking()
 {
 	_loggerPathTracking = spdlog::get("PathPlannerLogger");
 	_loggerPathTracking->info("PathTracking Startup");
-
+	
+//#ifdef DEBUG
 	PathPoint test;
 	test.CPt = { 1.0, 10.0, 3.0 };
-	test.FPt = { 100.0, 2.0 };
-	test.FVPt = { 3.0, 0.1 };
+	test.FDPt.Displacement = { 100.0, 2.0 };
+	test.FDPt.Velocity = { 3.0, 0.1 };
 	for (int i = 0; i < 10; i++)
 	{
-		test.FVPt.D += double(i);
+		test.FDPt.Velocity.D += double(i);
 		int els = AddPathPoint(test);
 		_loggerPathTracking->info("PathTracking: Now {} els in Path", els);
 	}
@@ -39,6 +40,7 @@ PathTracking::PathTracking()
 		size, FVPt.S, FVPt.D);
 	_loggerPathTracking->flush();
 	PathDeque.clear();
+//#endif //DEBUG
 	
 }
 
@@ -48,10 +50,34 @@ int PathTracking::AddPathPoint(PathPoint PPt)
 	return PathDeque.size();
 }
 
+int PathTracking::size()
+{
+	return PathDeque.size();
+}
+
+FrenetDescriptors PathTracking::GetFrenetDescriptorsAt(int PathIndex)
+{
+	return PathDeque.at(PathIndex).FDPt;
+}
+
+
+
 FrenetPoint PathTracking::GetFrenetSpeed(int PathIndex)
 {
-	return PathDeque.at(PathIndex).FVPt;
+	return PathDeque.at(PathIndex).FDPt.Velocity;
 }
+
+
+std::vector<CartesianPoint> PathTracking::GetCPath()
+{
+	std::vector<CartesianPoint> CPath;
+	for (PathPoint lPPt : PathDeque)
+	{
+		CPath.push_back(lPPt.CPt);
+	}
+	return(CPath);
+}
+
 
 // Remove points at start of Deque which we have already passed over.
 // Maybe leave 1 additional point which would match curent location

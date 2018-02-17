@@ -58,7 +58,7 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 	if (input.SpeedMpS > MaxVelocityReported)
 	{
 		MaxVelocityReported = input.SpeedMpS;
-		if (MaxVelocityReported > Trajectory::MaxSpeedMpS)
+		if (MaxVelocityReported > Trajectory::MaxSpeedMpS *0.995)
 		{
 			_logger->warn("Maximum Velocity of {:3.3f} mps or {:3.3f} mph recorded at ({:3.3f},{:3.3f}).", MaxVelocityReported, input.SpeedMpH, input.LocationCartesian.X, input.LocationCartesian.Y);
 			spdlog::get("console")->warn("Maximum Velocity of {:3.3f} mps or {:3.3f} mph recorded at ({:3.3f},{:3.3f}).", MaxVelocityReported, input.SpeedMpH, input.LocationCartesian.X, input.LocationCartesian.Y);
@@ -83,13 +83,13 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 	int check = PlannerMap.CreateRoadMap();
 
 	//Dump some info.
-	_logger->info("JMTBasedPlanner: In State: {} at Cartesian ( {:3.3f}, {:3.3f}, {:3.3f}  ) Frenet [ {:3.3f}, {:3.3f} ] going {:3.2f} mps = {:3.2f} MpH.",
-	        GetStateName(), input.LocationCartesian.X, input.LocationCartesian.Y, input.LocationCartesian.ThetaRads, 
+	_logger->info("JMTBasedPlanner: In State: {}  in Lane {} at Cartesian ( {:3.3f}, {:3.3f}, {:3.3f}  ) Frenet [ {:3.3f}, {:3.3f} ] going {:3.2f} mps = {:3.2f} MpH.",
+	        GetStateName(), input.LocationFrenet.GetLane(), input.LocationCartesian.X, input.LocationCartesian.Y, input.LocationCartesian.ThetaRads,
 		    input.LocationFrenet.S, input.LocationFrenet.D, currentSpeedMpS, input.SpeedMpH);
 	if (pathsize > 0)
 	{
-		_logger->info("JMTBasedPlanner: Pathsize is {}, co-ords ( {:3.3f}, {:3.3f}, {:3.3f}  ) Frenet [ {:3.3f}, {:3.3f} ] at end of Path and going {:3.2f} mps.",
-			pathsize, input.Path.back().X, input.Path.back().Y, input.Path.back().ThetaRads,
+		_logger->info("JMTBasedPlanner: Pathsize is {}, At end of Path in Lane {} co-ords ( {:3.3f}, {:3.3f}, {:3.3f}  ) Frenet [ {:3.3f}, {:3.3f} ] with speed {:3.2f} mps.",
+			pathsize, input.PathEndpointFrenet.GetLane(), input.Path.back().X, input.Path.back().Y, input.Path.back().ThetaRads,
 			input.PathEndpointFrenet.S, input.PathEndpointFrenet.D, laststep_targetspeed);
 	}
 	else
@@ -106,7 +106,7 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 		OutputPath = InitiateTrajectory(input);
 		EgoState = DriveInLane;
 		_logger->info("JMTBasedPlanner: Changing State to {} =============================== ", GetStateName());
-		spdlog::get("console")->warn("JMTBasedPlanner: Changing State to{} ============================== = ", GetStateName());
+		spdlog::get("console")->warn("JMTBasedPlanner: Changing State to {} ============================== = ", GetStateName());
 		break;
 	case DriveInLane:
 		targetLane = currentLane; // maybe should use pathendpoint ?
@@ -120,21 +120,18 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 
 			if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - KeepLaneTimer).count() > KEEP_LANE_MINIMUM_TIME)
 			{
-				std::cout << "Checking for lane Change " << std::endl;
+				_logger->info("Checking for lane Change ");
 				int test = PlannerMap.CheckForLaneChange();
-#ifdef DEBUG
-				test = -1;//running in lane to verify straight
-#endif // DEBUG
 				if ( test > -1)
 				{
-					targetLane = test;// PlannerMap.PlanTargetLane;
+					targetLane = PlannerMap.PlanTargetLane;
 					targetSpeed = Trajectory::MaxSpeedInLaneChangeMpS;
-					_logger->info("JMTBasedPlanner: Initiate Lane change to lane {} with desired velocity of {:3.2f}", 
-						PlannerMap.PlanTargetLane, targetSpeed);
+					_logger->info("JMTBasedPlanner: Initiate Lane change from Lane {} to Lane {} with desired velocity of {:3.2f} ", 
+						currentLane, PlannerMap.PlanTargetLane, targetSpeed);
 					OutputPath = GenerateJMTLaneChangeTrajectory(input, PlannerMap.PlanTargetLane, targetSpeed, true);
 					EgoState = ChangeLane;
 					_logger->info("JMTBasedPlanner: Changing State to {} =============================== ", GetStateName());
-					spdlog::get("console")->warn("JMTBasedPlanner: Changing State to{} ============================== = ", GetStateName());
+					spdlog::get("console")->warn("JMTBasedPlanner: Changing State to {} ============================== = ", GetStateName());
 					TimerSet = false;
 					break;
 				}
@@ -143,21 +140,31 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 		}
 
 		car_id = PlannerMap.CheckForSlowCarsAhead(JMTCarinfrontbuffer);
-		if (car_id > -1 and (( GetAcceleration() > 0) or (GetAcceleration() < 0 and pathsize<30))) {
+		if (car_id > -1){ // and (( GetAcceleration() > 0) or (GetAcceleration() < 0 and pathsize<30))) {
 			//do we need to slow down
-			targetSpeed = 0.995 * input.OtherCars.at(car_id).Speed2DMagnitudeMpS();
-			_logger->info("JMTBasedPlanner: found Othercar id = {} at offset {} with velocity {:3.2f}",
-				    input.OtherCars.at(car_id).id, car_id, input.OtherCars.at(car_id).Speed2DMagnitudeMpS());
+			if (DeccelerationLoopCounter > 0)
+			{
+				_logger->info("JMTBasedPlanner: found Othercar id = {} with velocity {:3.2f} but staying on Decceleration path for now.",
+					input.OtherCars.at(car_id).id, input.OtherCars.at(car_id).Speed2DMagnitudeMpS());
+				DeccelerationLoopCounter--;
+				OutputPath = { OldPath };
+				break;
+			}
+			targetSpeed = 0.99 * input.OtherCars.at(car_id).Speed2DMagnitudeMpS();
+			_logger->info("JMTBasedPlanner: found Othercar id = {} with velocity {:3.2f}",
+				    input.OtherCars.at(car_id).id, input.OtherCars.at(car_id).Speed2DMagnitudeMpS());
 
-			_logger->info("JMTBasedPlanner: sent to GenerateKeepLane with DesiredSpeed of {:3.2f}", targetSpeed);
+			_logger->info("JMTBasedPlanner: sent to GenerateKeepLane to prevent rear-ending with DesiredSpeed of {:3.2f}", targetSpeed);
 			OutputPath = GenerateKeepInLaneTrajectory(input, targetSpeed, true);
+			DeccelerationLoopCounter = 20;
 			break;
 		}
+		else DeccelerationLoopCounter = 0;
 
 		if (pathsize < 40) //(about every 2nd to 5th iteration)
 		{
 			targetSpeed = Trajectory::MaxSpeedMpS;
-			_logger->info("JMTBasedPlanner: send to GenerateKeepLane because only {} tracking points, DesiredVelocity = {}", pathsize, targetSpeed);
+			_logger->info("JMTBasedPlanner: send to GenerateKeepLane because only {} tracking points, DesiredVelocity = {:3.2f} ", pathsize, targetSpeed);
 			//reset to truncate to reduce offset errors.
 			OutputPath = GenerateKeepInLaneTrajectory(input, targetSpeed, true);
 		}else{
@@ -171,9 +178,9 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 			//pathplan forward at velocity, and change state to 
 			EgoState = DriveInLane;
 			_logger->info("JMTBasedPlanner: Changing State to {} ===============================", GetStateName());
-			spdlog::get("console")->warn("JMTBasedPlanner: Changing State to{} ============================== = ", GetStateName());
+			spdlog::get("console")->warn("JMTBasedPlanner: Changing State to {} ============================== = ", GetStateName());
 		}
-		if (input.Path.size() < 40) {
+		if (input.Path.size() < 20) {
 			//reinitiate move to target lane from current location - this probably needs to deal with D velocity....
 
 			if (input.LocationFrenet.GetLane() == targetLane)
@@ -187,12 +194,15 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 					_logger->info("JMTBasedPlanner: found Othercar id = {} at offset {} with velocity {:3.2f}",
 						input.OtherCars.at(car_id).id, car_id, input.OtherCars.at(car_id).Speed2DMagnitudeMpS());
 				}
-				_logger->info("JMTBasedPlanner: send to GenerateKeepInLane because in TargetLane {} with Pathsize of {} and DesiredVelocity = {}", targetLane, pathsize, targetSpeed);
+				_logger->info("JMTBasedPlanner: send to GenerateKeepInLane because in TargetLane {} with Pathsize of {} and DesiredVelocity = {:3.2f}", targetLane, pathsize, targetSpeed);
 				OutputPath = GenerateKeepInLaneTrajectory(input, targetSpeed);
 			}
-			targetSpeed = Trajectory::MaxSpeedInLaneChangeMpS;
-			_logger->info("JMTBasedPlanner: send to GenerateJMTLaneChangeTraj because not in TargetLane {} with Pathsize of {} and DesiredVelocity = {}", targetLane, pathsize, targetSpeed);
-			OutputPath = GenerateJMTLaneChangeTrajectory(input, targetLane, targetSpeed, true);
+			else
+			{
+				targetSpeed = Trajectory::MaxSpeedInLaneChangeMpS;
+				_logger->info("JMTBasedPlanner: send to GenerateJMTLaneChangeTraj because not in TargetLane {} with Pathsize of {} and DesiredVelocity = {:3.2f}", targetLane, pathsize, targetSpeed);
+				OutputPath = GenerateJMTLaneChangeTrajectory(input, targetLane, targetSpeed, true);
+			}
 		}
 		else 
 		{

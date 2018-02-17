@@ -78,7 +78,7 @@ int main(int argc, char * argv[])
 					if (length <= 2) // sometimes get messages containing just "2"
 						return;
 					string message (data, length);
-					console->info("Msg Received at {} mS after startup.", std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count());
+					//console->info("Msg Received at {} mS after startup.", std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count());
 					handler.HandleMessage(message, ws);
 				});
 

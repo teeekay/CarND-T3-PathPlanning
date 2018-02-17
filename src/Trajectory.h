@@ -11,8 +11,8 @@
 
 #define G_FORCE_MPS 9.8
 
-const double JMTMaxSpeedMpH = 48.0;// 48.0;//
-const double JMTMaxSpeedinLaneChangeMpH = 46.0;// 47.0;//? verify empirically if needed
+const double JMTMaxSpeedMpH = 49.0;// 48.0;//
+const double JMTMaxSpeedinLaneChangeMpH = 46.0;//
 
 struct Acc_Jerk
 {
@@ -38,24 +38,31 @@ public:
 	
 	std::vector<CartesianPoint> InitiateTrajectory(PathPlannerInput input);
 	std::vector<CartesianPoint> GenerateJMTLaneChangeTrajectory(PathPlannerInput input, int TargetLane, double DesiredVelocity, bool truncate=false);
+	std::vector<CartesianPoint> OldGenerateJMTLaneChangeTrajectory(PathPlannerInput input, int TargetLane, double DesiredVelocity, bool truncate = false);
 	std::vector<CartesianPoint> GenerateKeepInLaneTrajectory(PathPlannerInput input, double DesiredVelocity , bool truncate=false);
+	std::vector<CartesianPoint> OldGenerateKeepInLaneTrajectory(PathPlannerInput input, double DesiredVelocity, bool truncate = false);
 	double GetAcceleration();
 	void LogFPath(std::vector<FrenetPoint> FPath);
 	void LogCPath(std::vector<CartesianPoint> CPath);
 	const double MaxSpeedInLaneChangeMpS;
 	const double MaxSpeedMpS;
 private:
+
 	std::vector<CartesianPoint> TrimPath(std::vector<CartesianPoint> &Path, int NumberPoints);
 	std::vector<FrenetPoint> GenerateJMTPath(FrenetPoint LastFPt, FrenetPoint DestFPt, FrenetPoint LastSpeed, FrenetPoint TargetSpeed, double T,
 		                             bool GenerateZero = false, FrenetPoint LastAccel = { 0.0,0.0 }, FrenetPoint TargetAccel = { 0.0,0.0 });
+	std::vector<FrenetDescriptors> GenerateJMTDPath(FrenetPoint LastFPt, FrenetPoint DestFPt, FrenetPoint LastSpeed, FrenetPoint TargetSpeed, double T,
+		                             bool GenerateZero = false, FrenetPoint LastAccel = { 0.0,0.0 }, FrenetPoint TargetAccel = { 0.0,0.0 });
+
 	void OffsetPath(std::vector<CartesianPoint> &CPath, CartesianPoint LastCPt);
+	CartesianPoint GetOffset(CartesianPoint CalcCPt, CartesianPoint KnownCPt);
 	FrenetPoint GetFinalFAccel(std::vector<CartesianPoint> const & CPath);
 	
 	inline double MphToMetersPerSecond(double mphValue) { return mphValue * (1609.34 / 3600.0); }
 
 	const HighwayMap& map2;
 	const double MaxFwdAccelerationMpSsq = 0.25 * G_FORCE_MPS; /* 0.25 times force of gravity */
-	const double MaxBrakingAccelerationMpSsq = -0.25 * G_FORCE_MPS; /* 0.25 times force of gravity */
+	const double MaxBrakingAccelerationMpSsq = - 0.35 * G_FORCE_MPS; /* -0.25 times force of gravity */
 	const double SimulatorRunloopPeriod = 0.02;
 
 	PathTracking BuiltPath;

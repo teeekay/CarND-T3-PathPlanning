@@ -10,10 +10,12 @@
 #include "CartesianPoint.h"
 #include "spdlog/spdlog.h"
 
+
 class JMT {
 public:
 	JMT(std::vector<double> start_s, std::vector<double> start_d, std::vector<double> end_s, std::vector<double> end_d, double T);
 	FrenetPoint JMTDisplacementAt(double T);
+	FrenetDescriptors JMTFrenetDescriptorsAt(double t);
 private:
 	std::vector<std::vector<double>> JMTcoefficients;
 	double T;

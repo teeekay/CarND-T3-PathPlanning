@@ -99,24 +99,22 @@ int RoadMap::check_lanes() {
 		clearlanelengthsFWD.push_back(temp);
 		clearlanelengthsBACK.push_back(temp);
 		int EgoOffset = floor(EgoSpeedMpS*t*TimeIncrement);
-		for (int lane = 0; lane < NumLanes; lane++) {
 
+		for (int lane = 0; lane < NumLanes; lane++) {
 			auto itFWD = std::find_if(RoadMapNow.at(t).at(lane).begin() + RevLimit + EgoOffset, RoadMapNow.at(t).at(lane).end(), [](int x) { return x > 0; });
 			auto itBACK = std::find_if(RoadMapNow.at(t).at(lane).rbegin() + (FwdLimit - EgoOffset - 1), RoadMapNow.at(t).at(lane).rend(), [](int x) { return x > 0; });
 			clearlanelengthsFWD.at(t).at(lane) = std::distance(RoadMapNow.at(t).at(lane).begin() + RevLimit + EgoOffset, itFWD);
 			clearlanelengthsBACK.at(t).at(lane) = -(std::distance(itBACK, RoadMapNow.at(t).at(lane).rbegin() + (FwdLimit - EgoOffset - 1)));
-//			std::cout << "At time = " << double(t) * TimeIncrement << " Secs"
-//				<< "Clear ahead " << clearlanelengthsFWD.at(t).at(lane) << " m and back "
-//				<< clearlanelengthsBACK.at(t).at(lane) << " m in lane " << lane << ".  " << std::endl;
 		}
+
 	}
 	
 	MinLaneClearFWD.clear();
 	MinLaneClearBACK.clear();
 
 	for (int lane = 0; lane < NumLanes; lane++) {
-		int minclearfwd = 120.0;
-		int minclearback = 80.0;
+		int minclearfwd = 120;
+		int minclearback = 80;
 		for (int t = 0; t < NumIncrements; t++) {
 			if (minclearfwd > clearlanelengthsFWD.at(t).at(lane)) minclearfwd = clearlanelengthsFWD.at(t).at(lane);
 			if (minclearback > clearlanelengthsBACK.at(t).at(lane)) minclearback = clearlanelengthsBACK.at(t).at(lane);
@@ -124,11 +122,13 @@ int RoadMap::check_lanes() {
 		MinLaneClearFWD.push_back(minclearfwd);
 		MinLaneClearBACK.push_back(minclearback);
 	}
-	_loggerRoadMap->info("RoadMap: Next {}s Min clearances projected FWD [ {}, {}, {} ] , BACK [ {}, {}, {} ]. currently FWD [ {}, {}, {} ] , BACK [ {}, {}, {} ]", 
-	        NumIncrements*TimeIncrement, MinLaneClearFWD.at(0), MinLaneClearFWD.at(1), MinLaneClearFWD.at(2),
-		    MinLaneClearBACK.at(0), MinLaneClearBACK.at(1), MinLaneClearBACK.at(2)),
+
+	_loggerRoadMap->info("RoadMap: Next {:1.2f} s clearances FWD [ {:d}, {:d}, {:d} ] , BACK [ {:d}, {:d}, {:d} ]. currently FWD [ {:d}, {:d}, {:d} ] , BACK [ {:d}, {:d}, {:d} ]", 
+	        double(NumIncrements)*TimeIncrement,
+		    MinLaneClearFWD.at(0), MinLaneClearFWD.at(1), MinLaneClearFWD.at(2),
+		    MinLaneClearBACK.at(0), MinLaneClearBACK.at(1), MinLaneClearBACK.at(2),
 			clearlanelengthsFWD.at(0).at(0), clearlanelengthsFWD.at(0).at(1), clearlanelengthsFWD.at(0).at(2),
-		    clearlanelengthsBACK.at(0).at(0), clearlanelengthsBACK.at(0).at(1), clearlanelengthsBACK.at(0).at(2);
+		    clearlanelengthsBACK.at(0).at(0), clearlanelengthsBACK.at(0).at(1), clearlanelengthsBACK.at(0).at(2));
 	return 0;
 }
 
@@ -138,12 +138,10 @@ int RoadMap::CheckForLaneChange() {
 
 	int targetLane = -1;
 
-	//check_lanes();
-
 	//if (clearlanelengthsFWD.at(0).at(EgoCar.GetLane()) < 50) {  //don't check for lanechange if still > 50 m clear ahead for next couple seconds
 	if ( MinLaneClearFWD.at(EgoCar.GetLane())< 60) {
-		std::cout << "Now Fwd [" << clearlanelengthsFWD.at(0).at(0) <<", " << clearlanelengthsFWD.at(0).at(1) <<", " << clearlanelengthsFWD.at(0).at(2) << "] ";
-		std::cout << "Back [" << MinLaneClearBACK.at(0) << ", " << MinLaneClearBACK.at(1) << ", " << MinLaneClearBACK.at(2) << "] " << std::endl;
+		//std::cout << "Now Fwd [" << clearlanelengthsFWD.at(0).at(0) <<", " << clearlanelengthsFWD.at(0).at(1) <<", " << clearlanelengthsFWD.at(0).at(2) << "] ";
+		//std::cout << "Back [" << MinLaneClearBACK.at(0) << ", " << MinLaneClearBACK.at(1) << ", " << MinLaneClearBACK.at(2) << "] " << std::endl;
 
 		if((EgoCar.GetLane() == 0) and (clearlanelengthsFWD.at(0).at(0) < clearlanelengthsFWD.at(0).at(1)) and (MinLaneClearBACK.at(1) > 10)) // clearlanelengthsBACK.at(0).at(1) < -6))
 		{
@@ -199,7 +197,7 @@ int RoadMap::CheckForSlowCarsAhead()
 	if(MinLaneClearFWD.at(EgoCar.GetLane()) > 30) return -1;
 	int OtherCarID = RoadMapDeck.at(OtherCarsLayer).at(0).at(EgoCar.GetLane()).at(
 		    RevLimit + clearlanelengthsFWD.at(0).at(EgoCar.GetLane()));
-	_loggerRoadMap->info("RoadMap: Found OtherCarID = {} at distance of {:3.2f} m.", OtherCarID-1, clearlanelengthsFWD.at(0).at(EgoCar.GetLane()));
+	_loggerRoadMap->info("RoadMap: Found OtherCarID = {:d} at distance of {:d} m.", OtherCarID-1, clearlanelengthsFWD.at(0).at(EgoCar.GetLane()) );
 	return OtherCarID-1;
 }
 
@@ -207,11 +205,12 @@ int RoadMap::CheckForSlowCarsAhead(double distance)
 {
 	// if we have at least 30 m in the next X second window, everything is fine (?)
 	//std::cout << "Showing " << MinLaneClearFWD.at(EgoCar.GetLane()) << " m clear ahead in lane " << EgoCar.GetLane() << std::endl;
-	if (MinLaneClearFWD.at(EgoCar.GetLane()) > distance) return -1;
+	if (MinLaneClearFWD.at(EgoCar.GetLane()) > distance) return -1; //within time frame (2 secs, the car will be within buffer distance )
 	int OtherCarID = RoadMapDeck.at(OtherCarsLayer).at(0).at(EgoCar.GetLane()).at(
 		RevLimit + clearlanelengthsFWD.at(0).at(EgoCar.GetLane()));
-	_loggerRoadMap->info("RoadMap: Found OtherCarID = {} at distance of {:3.2f} m.", OtherCarID - 1, clearlanelengthsFWD.at(0).at(EgoCar.GetLane()));
-	//std::cout << "Found OtherCarID = " << OtherCarID - 1 << std::endl;
+	_loggerRoadMap->info("RoadMap: Found OtherCarID {:d} at distance of {:d} m.",
+		OtherCarID - 1, clearlanelengthsFWD.at(0).at(EgoCar.GetLane()) );
+	std::cout << "Found OtherCarID = " << OtherCarID - 1 << " at distance of " << clearlanelengthsFWD.at(0).at(EgoCar.GetLane())  << std::endl;
 	return OtherCarID - 1;
 }
 
