@@ -26,7 +26,7 @@ class JMTBasedPlanner : public PathPlanner, public Trajectory
 public:
 	explicit JMTBasedPlanner(const HighwayMap &map, int startingLane):
 		PathPlanner(map, startingLane), Trajectory(map), EgoState(Uninitialized),
-		DeccelerationLoopCounter(0)
+		DeccelerationLoopCounter(0), RecalcEndpoint(false)
 	{ };
 	std::vector<CartesianPoint> GeneratePath(PathPlannerInput input) override;
 private:
@@ -41,7 +41,8 @@ private:
 	EGOState EgoState;
 	bool TimerSet;
 	std::chrono::system_clock::time_point KeepLaneTimer;
-
+	double DOffset;
+	bool RecalcEndpoint;
 //	FrenetPoint LastIterEndpointFPt;
 	int DeccelerationLoopCounter;
 	char* GetStateName();

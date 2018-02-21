@@ -39,9 +39,12 @@ public:
 	std::vector<CartesianPoint> InitiateTrajectory(PathPlannerInput input);
 	std::vector<CartesianPoint> GenerateJMTLaneChangeTrajectory(PathPlannerInput input, int TargetLane, double DesiredVelocity, bool truncate=false);
 	std::vector<CartesianPoint> OldGenerateJMTLaneChangeTrajectory(PathPlannerInput input, int TargetLane, double DesiredVelocity, bool truncate = false);
-	std::vector<CartesianPoint> GenerateKeepInLaneTrajectory(PathPlannerInput input, double DesiredVelocity , bool truncate=false);
+	std::vector<CartesianPoint> GenerateKeepInLaneTrajectory(PathPlannerInput input, double DesiredVelocity , bool truncate=false,
+		double FinalFPtDOffset=0.0);
+	std::vector<CartesianPoint> RecalcTrajectory(PathPlannerInput input, double DOffset);
 	std::vector<CartesianPoint> OldGenerateKeepInLaneTrajectory(PathPlannerInput input, double DesiredVelocity, bool truncate = false);
 	double GetAcceleration();
+	FrenetPoint GetFrenetLocation(int pathsize);
 	void LogFPath(std::vector<FrenetPoint> FPath);
 	void LogCPath(std::vector<CartesianPoint> CPath);
 	const double MaxSpeedInLaneChangeMpS;
@@ -62,7 +65,7 @@ private:
 
 	const HighwayMap& map2;
 	const double MaxFwdAccelerationMpSsq = 0.25 * G_FORCE_MPS; /* 0.25 times force of gravity */
-	const double MaxBrakingAccelerationMpSsq = - 0.35 * G_FORCE_MPS; /* -0.25 times force of gravity */
+	const double MaxBrakingAccelerationMpSsq = - 0.30 * G_FORCE_MPS; /* -0.25 times force of gravity */
 	const double SimulatorRunloopPeriod = 0.02;
 
 	PathTracking BuiltPath;

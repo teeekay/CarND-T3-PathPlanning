@@ -57,14 +57,24 @@ int PathTracking::size()
 
 FrenetDescriptors PathTracking::GetFrenetDescriptorsAt(int PathIndex)
 {
-	return PathDeque.at(PathIndex).FDPt;
+	if (PathIndex >= 0 and PathIndex < PathDeque.size( ))
+	{
+		return PathDeque.at(PathIndex).FDPt;
+	}
+	FrenetDescriptors VoidFDPt = FrenetDescriptors();
+	return VoidFDPt;
 }
 
 
 
 FrenetPoint PathTracking::GetFrenetSpeed(int PathIndex)
 {
-	return PathDeque.at(PathIndex).FDPt.Velocity;
+	if (PathIndex >= 0 and PathIndex < PathDeque.size( ))
+	{
+		return PathDeque.at(PathIndex).FDPt.Velocity;
+	}
+	FrenetPoint VoidFPt = FrenetPoint( );
+	return VoidFPt;
 }
 
 
@@ -92,7 +102,7 @@ int PathTracking::TrimPathDequeAtStart(int ElementsToTrim)
 // Returns size of new PathDeque
 int PathTracking::TrimPathDequeAtEnd(int ElementsToTrim)
 {
-
 	PathDeque.erase(PathDeque.end() - (ElementsToTrim), PathDeque.end());
 	return PathDeque.size();
 }
+

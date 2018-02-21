@@ -74,9 +74,31 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 		currentFSpeedMPS = 50.0 * sqrt(pow(PathStartFPt.S - CurrentFPt.S, 2.0) + pow(PathStartFPt.D - CurrentFPt.D, 2.0));
 		laststep_targetspeed = 50.0 * sqrt(pow((input.Path.at(pathsize - 1).X - OldPath.at(pathsize - 2).X), 2.0) +
 			pow((OldPath.at(pathsize - 1).Y - OldPath.at(pathsize - 2).Y), 2.0));
+		
 	}
 	else laststep_targetspeed = currentSpeedMpS;
 
+	FrenetPoint PlannedFFPt;
+	double FFPtDDiscrep = 0.0; //discrepancy between planned frenet location and actual for this cart co-ord.
+	DOffset = 0.0;
+	if (RecalcEndpoint == true)
+	{
+		PlannedFFPt = GetFrenetLocation(0);
+		FFPtDDiscrep = input.PathEndpointFrenet.D - PlannedFFPt.D;
+//		DOffset = (PlannedFFPt.D - FrenetPoint::LaneCenterDCoord(targetLane)) + FFPtDDiscrep;
+		DOffset = FFPtDDiscrep;
+		if (fabs(DOffset) > 0.3)
+		{
+			spdlog::get("console")->warn("D discrepancy of {:1.3f} m at end of planned path, recalculate with DOffset = {} m",
+				FFPtDDiscrep, DOffset);
+		}
+		else
+		{
+			RecalcEndpoint = false;
+			DOffset = 0.0;
+		}
+		
+	}
 
 	int car_id;
 	RoadMap PlannerMap(input);
@@ -88,6 +110,7 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 		    input.LocationFrenet.S, input.LocationFrenet.D, currentSpeedMpS, input.SpeedMpH);
 	if (pathsize > 0)
 	{
+		
 		_logger->info("JMTBasedPlanner: Pathsize is {}, At end of Path in Lane {} co-ords ( {:3.3f}, {:3.3f}, {:3.3f}  ) Frenet [ {:3.3f}, {:3.3f} ] with speed {:3.2f} mps.",
 			pathsize, input.PathEndpointFrenet.GetLane(), input.Path.back().X, input.Path.back().Y, input.Path.back().ThetaRads,
 			input.PathEndpointFrenet.S, input.PathEndpointFrenet.D, laststep_targetspeed);
@@ -117,7 +140,13 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 		else
 		{
 			//std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - KeepLaneTimer).count() << " mS in Lane" << std::endl;
-
+			if (fabs(DOffset) > 0.3)
+			{
+				_logger->info("JMTBasedPlanner: send to RecalcTraj because endpoint is offset by {}, DesiredVelocity = {:3.2f} ", DOffset, targetSpeed);
+				//reset to truncate to reduce offset errors.
+				OutputPath = RecalcTrajectory(input, DOffset);
+				break;
+			}
 			if (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - KeepLaneTimer).count() > KEEP_LANE_MINIMUM_TIME)
 			{
 				_logger->info("Checking for lane Change ");
@@ -133,6 +162,7 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 					_logger->info("JMTBasedPlanner: Changing State to {} =============================== ", GetStateName());
 					spdlog::get("console")->warn("JMTBasedPlanner: Changing State to {} ============================== = ", GetStateName());
 					TimerSet = false;
+					RecalcEndpoint = true;
 					break;
 				}
 				_logger->info("JMTBasedPlanner: No available lane change opportunity found.");
@@ -142,7 +172,7 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 		car_id = PlannerMap.CheckForSlowCarsAhead(JMTCarinfrontbuffer);
 		if (car_id > -1){ // and (( GetAcceleration() > 0) or (GetAcceleration() < 0 and pathsize<30))) {
 			//do we need to slow down
-			if (DeccelerationLoopCounter > 0)
+			if (DeccelerationLoopCounter > 0 and pathsize > 20 and input.PathEndpointFrenet.IsAtCenterofLane(targetLane))
 			{
 				_logger->info("JMTBasedPlanner: found Othercar id = {} with velocity {:3.2f} but staying on Decceleration path for now.",
 					input.OtherCars.at(car_id).id, input.OtherCars.at(car_id).Speed2DMagnitudeMpS());
@@ -155,7 +185,8 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 				    input.OtherCars.at(car_id).id, input.OtherCars.at(car_id).Speed2DMagnitudeMpS());
 
 			_logger->info("JMTBasedPlanner: sent to GenerateKeepLane to prevent rear-ending with DesiredSpeed of {:3.2f}", targetSpeed);
-			OutputPath = GenerateKeepInLaneTrajectory(input, targetSpeed, true);
+			OutputPath = GenerateKeepInLaneTrajectory(input, targetSpeed, true, DOffset);
+			RecalcEndpoint = true;
 			DeccelerationLoopCounter = 20;
 			break;
 		}
@@ -167,7 +198,9 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 			_logger->info("JMTBasedPlanner: send to GenerateKeepLane because only {} tracking points, DesiredVelocity = {:3.2f} ", pathsize, targetSpeed);
 			//reset to truncate to reduce offset errors.
 			OutputPath = GenerateKeepInLaneTrajectory(input, targetSpeed, true);
-		}else{
+			RecalcEndpoint = true;
+		}
+        else{
 			_logger->info("JMTBasedPlanner: just use existing KeepInLane Path");
 			OutputPath = { OldPath };
 		}
@@ -195,22 +228,24 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 						input.OtherCars.at(car_id).id, car_id, input.OtherCars.at(car_id).Speed2DMagnitudeMpS());
 				}
 				_logger->info("JMTBasedPlanner: send to GenerateKeepInLane because in TargetLane {} with Pathsize of {} and DesiredVelocity = {:3.2f}", targetLane, pathsize, targetSpeed);
-				OutputPath = GenerateKeepInLaneTrajectory(input, targetSpeed);
+				OutputPath = GenerateKeepInLaneTrajectory(input, targetSpeed, false);
+				RecalcEndpoint = true;
 			}
 			else
 			{
 				targetSpeed = Trajectory::MaxSpeedInLaneChangeMpS;
 				_logger->info("JMTBasedPlanner: send to GenerateJMTLaneChangeTraj because not in TargetLane {} with Pathsize of {} and DesiredVelocity = {:3.2f}", targetLane, pathsize, targetSpeed);
 				OutputPath = GenerateJMTLaneChangeTrajectory(input, targetLane, targetSpeed, true);
+				RecalcEndpoint = true;
 			}
 		}
 		else 
 		{
 			_logger->info("JMTBasedPlanner:just use existing ChangeLane Path");
 			OutputPath = { OldPath };
+			RecalcEndpoint = false;
 		}
 
 	}
 	return OutputPath;
 }
-

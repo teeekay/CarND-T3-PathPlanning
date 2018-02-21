@@ -12,6 +12,10 @@
 
 #include "Trajectory.h"
 
+FrenetPoint Trajectory::GetFrenetLocation(int pathsize)
+{
+	return BuiltPath.GetFrenetDescriptorsAt(BuiltPath.size() - (pathsize+1)).Displacement;
+}
 
 
 
@@ -179,13 +183,14 @@ std::vector<CartesianPoint> Trajectory::InitiateTrajectory(PathPlannerInput inpu
 	CartesianPoint LastCPt = input.LocationCartesian;
 	_logger2->info("in InitiateTrajectory");
 
-	double T = 1.0;
+	double T = 2.0;
 	double Displacement = 0.5 * MaxFwdAccelerationMpSsq * pow(T, 2.0);
 	double TargetSpeed = MaxFwdAccelerationMpSsq * T;
 
 	FrenetPoint StartSpeed = { 0.0, 0.0 };
 	FrenetPoint LastSpeed = { TargetSpeed, 0.0 };
-	FrenetPoint EndFPt = { LastFPt.S + Displacement, LastFPt.D };//move forward before moving sideways
+	FrenetPoint EndFPt = { LastFPt.S + Displacement, LastFPt.LaneCenterDCoord(LastFPt.GetLane()) };//move forward before moving sideways
+//	FrenetPoint EndFPt = { LastFPt.S + Displacement, LastFPt.D };//move forward before moving sideways
 	
 	//generate frenet curve starting at the current location of the car
 	//std::vector<FrenetPoint> StartupFPath = GenerateJMTPath(LastFPt, EndFPt, StartSpeed, LastSpeed, T, true);
@@ -218,7 +223,8 @@ std::vector<CartesianPoint> Trajectory::InitiateTrajectory(PathPlannerInput inpu
 // build a trajectory to remain in the lane and move to the center
 // can decide to truncate existing path down to 10 points (useful for emergency braking or diversions,
 // or just append to current path
-std::vector<CartesianPoint> Trajectory::GenerateKeepInLaneTrajectory(PathPlannerInput input, double DesiredVelocity, bool Truncate)
+std::vector<CartesianPoint> Trajectory::GenerateKeepInLaneTrajectory(PathPlannerInput input, double DesiredVelocity, bool Truncate,
+	double FinalFPtDOffset )
 {
 	//Truncate = true;
 	//write out first points in input.path -here
@@ -265,7 +271,7 @@ std::vector<CartesianPoint> Trajectory::GenerateKeepInLaneTrajectory(PathPlanner
 		TargetFAccel = { 0.0, 0.0 };
 	}
 
-	NewEndFPt = { EndFPt.S + Displacement, EndFPt.LaneCenterDCoord(EndFPt.GetLane()) };
+	NewEndFPt = { EndFPt.S + Displacement, EndFPt.LaneCenterDCoord(EndFPt.GetLane())+FinalFPtDOffset };
 
 	_logger2->info("Trajectory: TargetFSpeed of {:3.3f} calculated from startspeed of {:3.3f} with Safe Acceleration of {:+3.3f} giving Displacement of {:2.3f} m. for StayInLanePath",
 		TargetFSpeed.S, EndFSpeed.S, Acceleration, Displacement);
@@ -476,6 +482,7 @@ std::vector<CartesianPoint> Trajectory::GenerateJMTLaneChangeTrajectory(PathPlan
 		}
 	}
 	
+
 	///////////////////////////////
 	// Add path along lane going straight so lane change does not need to be recalcuated due to short path. 
 
@@ -533,6 +540,55 @@ std::vector<CartesianPoint> Trajectory::GenerateJMTLaneChangeTrajectory(PathPlan
 	
 	return CPath;
 }
+
+
+std::vector<CartesianPoint> Trajectory::RecalcTrajectory(PathPlannerInput input, double DOffset)
+{
+	int PathSize = input.Path.size();
+	int DequeSize = BuiltPath.size();
+	DequeSize = BuiltPath.TrimPathDequeAtStart(DequeSize - PathSize);
+	std::vector<CartesianPoint> lCPts, CPath;
+	CPath = BuiltPath.GetCPath( );
+	LogCPath(CPath);
+	CPath.clear( );
+
+	double T = double(BuiltPath.size())*0.02;
+	FrenetDescriptors lFEndDPt = BuiltPath.GetFrenetDescriptorsAt(DequeSize - 1);
+	FrenetDescriptors lFEndDPt1 = BuiltPath.GetFrenetDescriptorsAt(DequeSize - 2);
+	FrenetDescriptors lFStartDPt = BuiltPath.GetFrenetDescriptorsAt(1);
+	FrenetDescriptors lFStartDPt1 = BuiltPath.GetFrenetDescriptorsAt(0);
+	lFEndDPt.Velocity = { (lFEndDPt.Displacement.S - lFEndDPt1.Displacement.S) / 0.02,
+		(lFEndDPt.Displacement.D - lFEndDPt1.Displacement.D) / 0.02 };
+	lFStartDPt1.Velocity = { (lFStartDPt1.Displacement.S - lFStartDPt.Displacement.S) / 0.02,
+		(lFStartDPt1.Displacement.D - lFStartDPt.Displacement.D) / 0.02 };
+	DequeSize = BuiltPath.TrimPathDequeAtEnd(BuiltPath.size()-1);  //cut to 1 point plus the current location
+
+	lFEndDPt.Displacement.D = input.PathEndpointFrenet.D - DOffset;
+
+	_logger->info("Traj: startpoint, {}, {} V.S= {} endpoint, {}, {} V.S={} , T= {}.",
+		lFStartDPt.Displacement.S, lFStartDPt.Displacement.D, lFStartDPt.Velocity.S,
+		lFEndDPt.Displacement.S, lFEndDPt.Displacement.D, lFEndDPt.Velocity.S, T);
+
+	std::vector<FrenetDescriptors> FDPath = GenerateJMTDPath(
+		lFStartDPt1.Displacement, lFEndDPt.Displacement,
+		lFStartDPt1.Velocity, lFEndDPt.Velocity,
+		T, false,
+		lFStartDPt1.Acceleration, lFEndDPt.Acceleration);
+	
+	PathPoint lPPt;
+	for (FrenetDescriptors lFDPt : FDPath)
+	{
+		lPPt.FDPt = lFDPt;
+		lPPt.CPt = map2.FrenetToCartesian(lFDPt.Displacement);
+		DequeSize = BuiltPath.AddPathPoint(lPPt);
+	}
+	CPath = BuiltPath.GetCPath();
+
+	LogCPath(CPath);
+	return CPath;
+}
+
+
 
 Acc_Jerk Trajectory::CheckPath(std::vector<CartesianPoint> Path, double time_increment, double v_init, double a_init)
 {
