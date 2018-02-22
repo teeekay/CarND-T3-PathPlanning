@@ -11,10 +11,10 @@
 
 PathTracking::PathTracking()
 {
-	_loggerPathTracking = spdlog::get("PathPlannerLogger");
-	_loggerPathTracking->info("PathTracking Startup");
+	_PTL = spdlog::get("PTL");
+	_PTL->info("PathTracking Startup");
 	
-//#ifdef DEBUG
+#ifdef DEBUG
 	PathPoint test;
 	test.CPt = { 1.0, 10.0, 3.0 };
 	test.FDPt.Displacement = { 100.0, 2.0 };
@@ -23,24 +23,24 @@ PathTracking::PathTracking()
 	{
 		test.FDPt.Velocity.D += double(i);
 		int els = AddPathPoint(test);
-		_loggerPathTracking->info("PathTracking: Now {} els in Path", els);
+		_PTL->info("PathTracking: Now {} els in Path", els);
 	}
 	for (int i = 0; i < 10; i++){
 		FrenetPoint FVPt = GetFrenetSpeed(i);
-		_loggerPathTracking->info("PathTracking: test {}: Frenet Velocity is [ {:3.2f}, {:3.2f} ]",
+		_PTL->info("PathTracking: test {}: Frenet Velocity is [ {:3.2f}, {:3.2f} ]",
 			i, FVPt.S, FVPt.D);
 	}
 	int size = TrimPathDequeAtStart(3);
 	FrenetPoint FVPt = GetFrenetSpeed(0);
-	_loggerPathTracking->info("PathTracking: new start after trimming 3: Frenet Velocity is [ {:3.2f}, {:3.2f} ]",
+	_PTL->info("PathTracking: new start after trimming 3: Frenet Velocity is [ {:3.2f}, {:3.2f} ]",
 		FVPt.S, FVPt.D);
 	size = TrimPathDequeAtEnd(3);
 	FVPt = GetFrenetSpeed(size-1);
-	_loggerPathTracking->info("PathTracking: new end after trimming 3 -new size is {}: Frenet Velocity is [ {:3.2f}, {:3.2f} ]",
+	_PTL->info("PathTracking: new end after trimming 3 -new size is {}: Frenet Velocity is [ {:3.2f}, {:3.2f} ]",
 		size, FVPt.S, FVPt.D);
-	_loggerPathTracking->flush();
+	_PTL->flush();
 	PathDeque.clear();
-//#endif //DEBUG
+#endif //DEBUG
 	
 }
 
@@ -104,5 +104,18 @@ int PathTracking::TrimPathDequeAtEnd(int ElementsToTrim)
 {
 	PathDeque.erase(PathDeque.end() - (ElementsToTrim), PathDeque.end());
 	return PathDeque.size();
+}
+
+int PathTracking::logpath( )
+{
+	int i = 0;
+	for (PathPoint lPPt : PathDeque)
+	{
+		_PTL->info("index: {:d} Frenet: {:4.3f}, {:4.3f} Velocity: {:2.3f}, {:2.3f} Cartesian: {:4.3f}, {:4.3f}, {:4.3f}",
+			i, lPPt.FDPt.Displacement.S, lPPt.FDPt.Displacement.D , lPPt.FDPt.Velocity.S, lPPt.FDPt.Velocity.D,
+			lPPt.CPt.X, lPPt.CPt.Y, lPPt.CPt.ThetaRads);
+		i++;
+	}
+	return i;
 }
 

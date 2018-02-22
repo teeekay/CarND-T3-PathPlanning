@@ -10,8 +10,8 @@
 const double LaneWidthInD = 4.0;
 const double LaneCentreLocator = (LaneWidthInD / 2.0) * 0.95; //offset to check if car is travelling along centre of lane
 
-															  // move centrelines of outside lanes in by 10 cm
-const std::vector<double> LaneCentreD = { 2.1,6.0,9.9 };
+															  // move centrelines of outside lanes in by 15 cm
+const std::vector<double> LaneCentreD = { 2.15,6.0,9.85 };
 
 
 //describe kinematics of car at specific point in time using S,D framework
@@ -31,6 +31,12 @@ struct FrenetPoint
                 D > LaneWidthInD * laneNumber; }
 	inline bool IsAtCenterofLane(int laneNumber) const {
 		        return (fabs(D - LaneCenterDCoord(laneNumber)) < 0.1) ? true : false; }
+
+	template<typename OStream>
+	friend OStream& operator<<(OStream& os, const FrenetPoint &c)
+	{
+		return os << "frenet [" << c.S << " , "<< c.D <<"]";
+	}
 };
 
 struct FrenetDescriptors

@@ -34,7 +34,10 @@ public:
 	explicit Trajectory(const HighwayMap &map): map2(map), 
 		MaxSpeedMpS(MphToMetersPerSecond(JMTMaxSpeedMpH)), 
 		MaxSpeedInLaneChangeMpS(MphToMetersPerSecond(JMTMaxSpeedinLaneChangeMpH))
-	    { _logger2 = spdlog::get("PathPlannerLogger"); }
+	{ 
+		_TL = spdlog::get("Traj"); 
+		_TL->info("Trajectory startup.");
+	}
 	
 	std::vector<CartesianPoint> InitiateTrajectory(PathPlannerInput input);
 	std::vector<CartesianPoint> GenerateJMTLaneChangeTrajectory(PathPlannerInput input, int TargetLane, double DesiredVelocity, bool truncate=false);
@@ -53,9 +56,9 @@ private:
 
 	std::vector<CartesianPoint> TrimPath(std::vector<CartesianPoint> &Path, int NumberPoints);
 	std::vector<FrenetPoint> GenerateJMTPath(FrenetPoint LastFPt, FrenetPoint DestFPt, FrenetPoint LastSpeed, FrenetPoint TargetSpeed, double T,
-		                             bool GenerateZero = false, FrenetPoint LastAccel = { 0.0,0.0 }, FrenetPoint TargetAccel = { 0.0,0.0 });
+		                             bool GenerateZero = false, FrenetPoint LastAccel={ 0.0,0.0 }, FrenetPoint TargetAccel={ 0.0,0.0 });
 	std::vector<FrenetDescriptors> GenerateJMTDPath(FrenetPoint LastFPt, FrenetPoint DestFPt, FrenetPoint LastSpeed, FrenetPoint TargetSpeed, double T,
-		                             bool GenerateZero = false, FrenetPoint LastAccel = { 0.0,0.0 }, FrenetPoint TargetAccel = { 0.0,0.0 });
+		                             bool GenerateZero = false, FrenetPoint LastAccel={ 0.0,0.0 }, FrenetPoint TargetAccel={ 0.0,0.0 });
 
 	void OffsetPath(std::vector<CartesianPoint> &CPath, CartesianPoint LastCPt);
 	CartesianPoint GetOffset(CartesianPoint CalcCPt, CartesianPoint KnownCPt);
@@ -65,20 +68,17 @@ private:
 
 	const HighwayMap& map2;
 	const double MaxFwdAccelerationMpSsq = 0.25 * G_FORCE_MPS; /* 0.25 times force of gravity */
-	const double MaxBrakingAccelerationMpSsq = - 0.30 * G_FORCE_MPS; /* -0.25 times force of gravity */
+	const double MaxBrakingAccelerationMpSsq = - 0.25 * G_FORCE_MPS; /* -0.25 times force of gravity */
 	const double SimulatorRunloopPeriod = 0.02;
 
 	PathTracking BuiltPath;
 
-//	double TargetSpeed;
 	double Acceleration;
-//	double EndSpeed;
-//	double currentSpeedMpS;
 	double MaxVelocityReported;
 	FrenetPoint LastIterEndpointFPt;
 	double GetSafeAcceleration(double accel);
 	Acc_Jerk CheckPath(std::vector<CartesianPoint> Path, double time_increment, double v_init = 0.0, double a_init = 0.0);
-	std::shared_ptr<spdlog::logger> _logger2;
+	std::shared_ptr<spdlog::logger> _TL;
 };
 
 

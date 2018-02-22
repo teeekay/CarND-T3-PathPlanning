@@ -7,10 +7,12 @@
 #include "Trajectory.h"
 
 #include "spline.h"
+#include "spdlog/spdlog.h"
+#include "spdlog/fmt/ostr.h"
 
 
 
-const double JMTCarinfrontbuffer = 15.0;//15.0//20.0  //4 means you've hit it!
+const double JMTCarinfrontbuffer = 19.0;//15.0//20.0  //4 means you've hit it!
 
 enum EGOState {
 	Uninitialized,
@@ -26,13 +28,23 @@ class JMTBasedPlanner : public PathPlanner, public Trajectory
 public:
 	explicit JMTBasedPlanner(const HighwayMap &map, int startingLane):
 		PathPlanner(map, startingLane), Trajectory(map), EgoState(Uninitialized),
-		DeccelerationLoopCounter(0), RecalcEndpoint(false)
-	{ };
+		DeccelerationLoopCounter(0)
+	{
+		spdlog::get("console")->info("loading JMTBasedPlanner");
+		try
+		{
+			_JPL = spdlog::get("JPlan");
+		}
+		catch (const spdlog::spdlog_ex& ex)
+		{
+			std::cerr << "Log initialization failed: " << ex.what( ) << std::endl;
+		}
+		_JPL->info("JMTBasedPlanner Startup.");
+		_JPL->flush( );
+	};
 	std::vector<CartesianPoint> GeneratePath(PathPlannerInput input) override;
 private:
 	double targetSpeed;
-//	double MaxSpeedInLaneChangeMpS;
-//	double MaxSpeedMpS;
 	double acceleration;
 	double laststep_targetspeed;
 	double currentSpeedMpS;
@@ -41,12 +53,9 @@ private:
 	EGOState EgoState;
 	bool TimerSet;
 	std::chrono::system_clock::time_point KeepLaneTimer;
-	double DOffset;
-	bool RecalcEndpoint;
-//	FrenetPoint LastIterEndpointFPt;
 	int DeccelerationLoopCounter;
 	char* GetStateName();
-//	Trajectory Traj;
+	std::shared_ptr<spdlog::logger> _JPL;
 };
 
 

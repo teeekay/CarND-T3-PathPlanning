@@ -69,7 +69,7 @@ PathPlannerInput WebSocketMessageHandler::ReadPlannerInput(json data)
     pathPlannerInput.PreviousPathX = data["previous_path_x"].get<std::vector<double>>();
     pathPlannerInput.PreviousPathY = data["previous_path_y"].get<std::vector<double>>();
 
-//	std::cout << "receiving Path:" << std::endl;
+	//std::cout << "receiving Path:" << std::endl;
 
     assert(pathPlannerInput.PreviousPathX.size() == pathPlannerInput.PreviousPathY.size());
 	

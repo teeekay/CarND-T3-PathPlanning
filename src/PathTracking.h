@@ -34,9 +34,10 @@ public:
 	int TrimPathDequeAtEnd(int ElementsToTrim);
 	std::vector<CartesianPoint> GetCPath();
 	int size();
+	int logpath( );
 private:
 	std::deque<PathPoint> PathDeque;
-	std::shared_ptr<spdlog::logger> _loggerPathTracking;
+	std::shared_ptr<spdlog::logger> _PTL;
 };
 
 #endif //PATHTRACKER_H

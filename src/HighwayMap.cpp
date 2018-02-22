@@ -12,15 +12,17 @@
 
 HighwayMap::HighwayMap(const std::string &highwayMapCsvPath)
 {
+	
 	try
 	{
-		_loggerHighwayMap = spdlog::get("PathPlannerLogger");
+		_loggerHighwayMap = spdlog::get("Map");
 	}
 	catch (const spdlog::spdlog_ex& ex)
 	{
-		std::cout << "Log initialization failed: " << ex.what() << std::endl;
+		std::cout << "HighwayMap Log initialization failed: " << ex.what() << std::endl;
 	}
 	_loggerHighwayMap->info("Loading Highway Map");
+	_loggerHighwayMap->flush( );
 	ReadMapFromCsvFile(highwayMapCsvPath);
 }
 

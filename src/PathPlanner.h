@@ -15,8 +15,6 @@ class PathPlanner
 {
 public:
 	explicit PathPlanner(const HighwayMap &map, int startingLane);
-    //explicit PathPlanner(const HighwayMap &map, int startingLane) : map(map), targetLane(startingLane), _logger (spdlog::get("PathPlannerLogger")) {}
-//	explicit PathPlanner(const HighwayMap &map, int startingLane) : map(map), targetLane(startingLane) {}
     virtual std::vector<CartesianPoint> GeneratePath(PathPlannerInput input) = 0;
 	inline double rad2deg(double x) { return x * 180.0 / M_PI; }
 	inline double deg2rad(double x) { return x * M_PI / 180.0; }
@@ -27,7 +25,7 @@ protected:
     const HighwayMap& map;
 	int currentLane;  //add this maybe for lane changes
     int targetLane;
-	std::shared_ptr<spdlog::logger> _logger;
+	std::shared_ptr<spdlog::logger> _PlanL;
 };
 
 

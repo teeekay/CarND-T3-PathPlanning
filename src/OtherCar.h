@@ -1,5 +1,6 @@
 //
 // Created by Stanislav Olekhnovich on 21/10/2017.
+// Modified by Anthony Knight on 10/01/2018
 //
 
 #ifndef PATH_PLANNING_OTHERCAR_H

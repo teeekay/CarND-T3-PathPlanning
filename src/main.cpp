@@ -11,35 +11,88 @@
 #include <chrono>
 #include <ctime>
 #include <thread>
+#include <iostream>
 #include "json.hpp"
 
 #include "spdlog/spdlog.h"
-namespace spd = spdlog;
+#include "spdlog/sinks/sink.h"
+#include "spdlog/fmt/ostr.h"
+//namespace spd = spdlog;
+#ifdef MSVS_DEBUG
+#define LOGFILE "/mnt/c/Users/tknight/Source/Repos/CarND/CarND-T3-PathPlanning/Ubuntu_build/logs/PPlan.log"
+#define MAPFILE "/mnt/c/Users/tknight/Source/Repos/CarND/CarND-T3-PathPlanning/data/highway_map.csv"
+#else
+#define LOGFILE "PPlan.log"
+#define MAPFILE "../data/highway_map.csv"
+#endif
+
+
 #include <memory>
+
+
+
 
 //#define KEEPLANE_PATHPLANNER
 //#define SPLINE_PATHPLANNER
 
 #ifdef KEEPLANE_PATHPLANNER
 #include "KeepLanePathPlanner.h"
+#define PATHPLANNER KeepLanePathPlanner
 #else
 #ifdef SPLINE_PATHPLANNER
 #include "SimpleSplineBasedPlanner.h"
+#define PATHPLANNER SimpleSplineBasedPlanner
 #else
 #include "JMTBasedPlanner.h"
+#define PATHPLANNER JMTBasedPlanner
 #endif //SPLINE_PATHPLANNER
 #endif //KEEPLANE_PATHPLANNER
 
 #include "WebSocketMessageHandler.h"
 
-using namespace std;
+//using namespace std;
 
-using std::string;
-using std::cout;
-using std::endl;
-using std::cerr;
+//using std::string;
+//using std::cout;
+//using std::endl;
+//using std::cerr;
 
 const int StartingLane = 1;
+
+
+void SetupLogging( )
+{
+	try
+	{
+		//	auto my_logger = spd::basic_logger_st("PathPlannerLogger", );
+		auto SharedFileSink = std::make_shared<spdlog::sinks::simple_file_sink_mt>("PPlan.log");
+		//auto SharedFileSink = std::make_shared<spdlog::sinks::daily_file_sink_mt>("PPlan", 23, 59);
+		
+		auto planL = std::make_shared<spdlog::logger>("Plan", SharedFileSink);
+		spdlog::register_logger(planL);
+		auto jplanL = std::make_shared<spdlog::logger>("JPlan", SharedFileSink);
+		spdlog::register_logger(jplanL);
+		auto mainL = std::make_shared<spdlog::logger>("Main", SharedFileSink);
+		spdlog::register_logger(mainL);
+		auto trajL = std::make_shared<spdlog::logger>("Traj", SharedFileSink);
+		spdlog::register_logger(trajL);
+		auto mapL = std::make_shared<spdlog::logger>("Map", SharedFileSink);
+		spdlog::register_logger(mapL);
+		auto predL = std::make_shared<spdlog::logger>("Pred", SharedFileSink);
+		spdlog::register_logger(predL);
+		auto pathtrackL = std::make_shared<spdlog::logger>("PTL", SharedFileSink);
+		spdlog::register_logger(pathtrackL);
+		auto jmtL = std::make_shared<spdlog::logger>("JMT", SharedFileSink);
+		spdlog::register_logger(jmtL);
+	}
+	catch (const spdlog::spdlog_ex& ex)
+	{
+		std::cout << "Log initialization failed: " << ex.what( ) << std::endl;
+	}
+}
+
+
+
 
 
 
@@ -47,25 +100,28 @@ int main(int argc, char * argv[])
 {
 	uWS::Hub h;
 
-	auto console = spd::stdout_color_st("console");
-	auto my_logger = spd::basic_logger_st("PathPlannerLogger", "/mnt/c/Users/tknight/Source/Repos/CarND/CarND-T3-PathPlanning/Ubuntu_build/logs/PathPlanner.txt");
+	auto console = spdlog::stdout_color_st("console");
 	console->info("Starting Path Planning System up");
+	SetupLogging( );
+	console->info("Logging set up.");
 
-	//HighwayMap map("../data/highway_map.csv");
-	HighwayMap map("/mnt/c/Users/tknight/Source/Repos/CarND/CarND-T3-PathPlanning/data/highway_map.csv");
-
+	auto ML = spdlog::get("Main");
+	ML->info("System starting Up.");
+	
+	HighwayMap map(MAPFILE);
 
 	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 
-#ifdef KEEPLANE_PATHPLANNER
-	  KeepLanePathPlanner pathPlanner(map, StartingLane);
-#else
-#ifdef SPLINE_PATHPLANNER
-	  SimpleSplineBasedPlanner pathPlanner(map, StartingLane);
-#else
-	JMTBasedPlanner pathPlanner(map, StartingLane);
-#endif
-#endif
+	PATHPLANNER pathPlanner(map, StartingLane);
+//#ifdef KEEPLANE_PATHPLANNER
+//	  KeepLanePathPlanner pathPlanner(map, StartingLane);
+//#else
+//#ifdef SPLINE_PATHPLANNER
+//	  SimpleSplineBasedPlanner pathPlanner(map, StartingLane);
+//#else
+//	JMTBasedPlanner pathPlanner(map, StartingLane);
+//#endif
+//#endif
 
 	WebSocketMessageHandler handler(pathPlanner);
 
@@ -100,4 +156,5 @@ int main(int argc, char * argv[])
 		console->error ("Failed to listen to port", port);
 
 	h.run();
+	ML->warn("Goodbye");
 }
