@@ -19,8 +19,6 @@
 // if we plan 50 points ahead at maximum speed of 49.5 mph = 22.1 mps, and at 0.02 sec intervals, we will only go out 22.1 m.
 
 
-//static const int XAxisPlanningHorizon = 60;
-//const double CriticalThresholdInMeters = 20; //15
 const double SimulatorRunloopPeriod = 0.02;
 static const int MaxNumberOfPointsInPath = 120;
 
@@ -35,8 +33,6 @@ char* JMTBasedPlanner::GetStateName(void)
 		return (char *)"DriveInLane";
 	case ChangeLane:
 		return (char *)"ChangeLane";
-	case MatchVelocity:
-		return (char *)"MatchVelocity";
 	}
 	return (char *)"Invalid - check GetStateName function";
 }
@@ -51,7 +47,7 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 	if (input.SpeedMpS > MaxVelocityReported)
 	{
 		MaxVelocityReported = input.SpeedMpS;
-		if (MaxVelocityReported > Trajectory::MaxSpeedMpS *0.995)
+		if (MaxVelocityReported > Trajectory::MaxSpeedMpS * 0.995)
 		{
 			_JPL->warn("Maximum Velocity of {:3.3f} mps or {:3.3f} mph recorded at ({:3.3f},{:3.3f}).", MaxVelocityReported, input.SpeedMpH, input.LocationCartesian.X, input.LocationCartesian.Y);
 			spdlog::get("console")->warn("Maximum Velocity of {:3.3f} mps or {:3.3f} mph recorded at ({:3.3f},{:3.3f}).", MaxVelocityReported, input.SpeedMpH, input.LocationCartesian.X, input.LocationCartesian.Y);
@@ -68,8 +64,8 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 	else laststep_targetspeed = currentSpeedMpS;
 
 
-	int car_id;
-	RoadMap PlannerMap(input);
+	int car_id, car2_id;
+	RoadMap PlannerMap(map, input);
 	int check = PlannerMap.CreateRoadMap();
 
 	//_JPL->info("In State: {}  in Lane {} at Cartesian ( {:3.3f}, {:3.3f}, {:3.3f}  ) Frenet [ {:3.3f}, {:3.3f} ] going {:3.2f} mps = {:3.2f} MpH.",
@@ -95,12 +91,24 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 	switch(EgoState)
 	{
 	case Uninitialized:
-		//switch states to DriveInLane
-		targetSpeed = Trajectory::MaxSpeedMpS;
-		OutputPath = InitiateTrajectory(input);
-		EgoState = DriveInLane;
-		_JPL->info("Changing State to {} =============================== ", GetStateName());
-		spdlog::get("console")->warn("Changing State to {} ============================== = ", GetStateName());
+		//switch states to DriveInLane once moving
+		if (pathsize == 0)
+		{
+			_JPL->info("In State {} =============================== ", GetStateName( ));
+			spdlog::get("console")->warn("In State {} ============================== = ", GetStateName( ));
+			targetSpeed = Trajectory::MaxSpeedMpS;
+			OutputPath = InitiateTrajectory(input);
+		}
+		else
+		{
+			OutputPath = { OldPath };
+			if (pathsize < 20)
+			{
+				EgoState = DriveInLane;
+				_JPL->info("Changing State to {} =============================== ", GetStateName( ));
+				spdlog::get("console")->warn("Changing State to {} ============================== = ", GetStateName( ));
+			}
+		}
 		break;
 	case DriveInLane:
 		targetLane = currentLane;
@@ -118,7 +126,20 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 				if ( test > -1)
 				{
 					targetLane = PlannerMap.PlanTargetLane;
-					targetSpeed = Trajectory::MaxSpeedInLaneChangeMpS;
+					car2_id = PlannerMap.CheckForSlowCarInOtherLane(targetLane, 2*JMTCarinfrontbuffer);
+					if (car2_id > -1)
+					{
+					
+						double gap = RangeS(map.CartesianToFrenet(input.OtherCars.at(car2_id).LocationCartesian).S - input.LocationFrenet.S);
+						targetSpeed = 0.98 * input.OtherCars.at(car2_id).Speed2DMagnitudeMpS( );  
+						if (targetSpeed > Trajectory::MaxSpeedMpS) targetSpeed = Trajectory::MaxSpeedMpS;
+						_JPL->info("found Othercar id = {} in targetLane {} with velocity {:3.2f} at distance of {:3.2f} m.",
+							input.OtherCars.at(car2_id).id, targetLane, input.OtherCars.at(car2_id).Speed2DMagnitudeMpS( ), gap);
+						if (targetSpeed > Trajectory::MaxSpeedInLaneChangeMpS) targetSpeed = Trajectory::MaxSpeedInLaneChangeMpS;
+					
+					} else 
+						targetSpeed = Trajectory::MaxSpeedInLaneChangeMpS;
+					
 					_JPL->info("Initiate Lane change from Lane {} to Lane {} with desired velocity of {:3.2f} ", 
 						currentLane, PlannerMap.PlanTargetLane, targetSpeed);
 					OutputPath = GenerateJMTLaneChangeTrajectory(input, PlannerMap.PlanTargetLane, targetSpeed, true);
@@ -134,9 +155,10 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 
 		car_id = PlannerMap.CheckForSlowCarsAhead(JMTCarinfrontbuffer);
 		if (car_id > -1){ 
-			double gap = input.OtherCars.at(car_id).LocationFrenet.S - input.LocationFrenet.S;
+			//switched to using car cartesian, because  sometimes Frenet co-ords received are corrupted (near S=0)
+			double gap = RangeS(map.CartesianToFrenet(input.OtherCars.at(car_id).LocationCartesian).S - input.LocationFrenet.S); // from HighwayMap
 			//do we need to slow down
-			if (DeccelerationLoopCounter > 0 and pathsize > 20 and input.PathEndpointFrenet.IsAtCenterofLane(targetLane))
+			if (DeccelerationLoopCounter > 0 and pathsize > 20 )// remove req for centerlane and input.PathEndpointFrenet.IsAtCenterofLane(targetLane))
 			{
 				_JPL->info("found Othercar id = {} with velocity {:3.2f} at distance {:3.2f} m but staying on Decceleration path for now.",
 					input.OtherCars.at(car_id).id, input.OtherCars.at(car_id).Speed2DMagnitudeMpS(), gap);
@@ -144,7 +166,7 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 				OutputPath = { OldPath };
 				break;
 			}
-			targetSpeed = 0.99 * input.OtherCars.at(car_id).Speed2DMagnitudeMpS();
+			targetSpeed = 0.98 * input.OtherCars.at(car_id).Speed2DMagnitudeMpS();  //was .99
 			if (targetSpeed > Trajectory::MaxSpeedMpS) targetSpeed = Trajectory::MaxSpeedMpS;
 			_JPL->info("found Othercar id = {} with velocity {:3.2f} at distance of {:3.2f} m.",
 				    input.OtherCars.at(car_id).id, input.OtherCars.at(car_id).Speed2DMagnitudeMpS(), gap);
@@ -186,7 +208,7 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 				if (car_id > -1 and ((GetAcceleration() > 0) or (GetAcceleration() < 0 and pathsize < 30)))
 				{
 					//do we need to slow down
-					targetSpeed = 0.995 * input.OtherCars.at(car_id).Speed2DMagnitudeMpS();
+					targetSpeed = 0.90 * input.OtherCars.at(car_id).Speed2DMagnitudeMpS();  //safety factor increased here
 					_JPL->info("found Othercar id = {} at offset {} with velocity {:3.2f}",
 						input.OtherCars.at(car_id).id, car_id, input.OtherCars.at(car_id).Speed2DMagnitudeMpS());
 				}

@@ -1,5 +1,6 @@
 //
 // Created by Stanislav Olekhnovich on 13/10/2017.
+// see https://github.com/fspirit/path-planning-starter
 // Customized by Anthony Knight on 17/01/2018
 //
 
@@ -26,9 +27,22 @@ struct FrenetPoint
 
 	// return d value of centrepoint of desired lane
     inline static double LaneCenterDCoord(int laneNumber) { return LaneCentreD.at(laneNumber); };
-	inline int GetLane() { return int(D / LaneWidthInD); };
+	inline int GetLane() { 
+		int lane;
+		if (D < 4.0) lane = 0;
+		if (D > 4.0) lane = 1;
+		if (D > 8.0) lane = 2;
+		return lane; // int(D / LaneWidthInD); some occurrences of D outside 0-12
+	};
     inline bool IsInLane(int laneNumber) const { return D < LaneWidthInD * (laneNumber + 1)  &&
                 D > LaneWidthInD * laneNumber; }
+
+	inline bool WithinLane(int LaneNumber) const  //use to see if other cars are in a lane (even partially)
+	{
+		bool result = ((fabs(D - LaneCentreD.at(LaneNumber)) < 2.75) or (LaneNumber == 2 and D > LaneCentreD.at(LaneNumber)) or
+			(LaneNumber == 0 and D < LaneCentreD.at(LaneNumber)));
+		return result;
+	}
 	inline bool IsAtCenterofLane(int laneNumber) const {
 		        return (fabs(D - LaneCenterDCoord(laneNumber)) < 0.1) ? true : false; }
 

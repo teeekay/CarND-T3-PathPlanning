@@ -1,3 +1,6 @@
+// JMT.cpp code from Udacity Lessons
+// Modified by Anthony M Knight 30/01/2018
+
 #include <cstdio>
 #include <iostream>
 #include <fstream>

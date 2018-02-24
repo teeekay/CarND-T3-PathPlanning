@@ -190,7 +190,6 @@ std::vector<CartesianPoint> Trajectory::InitiateTrajectory(PathPlannerInput inpu
 
 	FrenetPoint StartSpeed = { 0.0, 0.0 };
 	FrenetPoint LastSpeed = { TargetSpeed, 0.0 };
-	//FrenetPoint EndFPt = { LastFPt.S + Displacement, LastFPt.LaneCenterDCoord(LastFPt.GetLane()) };
 	FrenetPoint EndFPt = { LastFPt.S + Displacement, LastFPt.D };
 
 	//generate frenet curve starting at the current location of the car
@@ -210,8 +209,7 @@ std::vector<CartesianPoint> Trajectory::InitiateTrajectory(PathPlannerInput inpu
 	_TL->flush( );
 	Acc_Jerk PathTest = CheckPath(CPath, SimulatorRunloopPeriod, input.SpeedMpS);
 	BuiltPath.logpath( );
-    // LogCPath(CPath);
-	return CPath;
+ 	return CPath;
 }
 //
 // build a trajectory to remain in the lane and move to the center
@@ -236,12 +234,6 @@ std::vector<CartesianPoint> Trajectory::GenerateKeepInLaneTrajectory(PathPlanner
 	if (Truncate)
 	{
 		DequeSize = BuiltPath.TrimPathDequeAtEnd(DequeSize - (SafeToTrimTo+1));  //cut to 5 points plus the current location
-
-//		Offset = GetOffset(map2.FrenetToCartesian(input.LocationFrenet), input.LocationCartesian);
-	}
-	else
-	{
-//		Offset = GetOffset(map2.FrenetToCartesian(input.PathEndpointFrenet), input.Path.back());
 	}
 
 	FrenetDescriptors lFDPt = BuiltPath.GetFrenetDescriptorsAt(DequeSize - 1);
@@ -251,7 +243,6 @@ std::vector<CartesianPoint> Trajectory::GenerateKeepInLaneTrajectory(PathPlanner
 	EndFSpeed = {(lFDPt.Displacement.S - lFDPt1.Displacement.S) / 0.02, (lFDPt.Displacement.D - lFDPt1.Displacement.D) / 0.02 };
 	EndFAccel = lFDPt.Acceleration;
 
-	//T = Truncate ? 2.0 : 1.0;
 	T = 1.0;
 	TargetFSpeed = { DesiredVelocity, 0.0 };
 
@@ -321,10 +312,9 @@ std::vector<CartesianPoint> Trajectory::GenerateKeepInLaneTrajectory(PathPlanner
 			}
 			else
 			{
-
 				_TL->warn("Recalculating StayInLanePath because Max_Vel of {} exceeds Max velocity of {} mps. Dumping Path for debug:",
 					PathTest.Max_Vel, MaxSpeedMpS);
-				LogCPath(CPath);
+				BuiltPath.logpath( );//	LogCPath(CPath);
 				double vel_diff = PathTest.Max_Vel - MaxSpeedMpS > 1.0 ? (PathTest.Max_Vel - MaxSpeedMpS)*1.5 : 1.0;
 				TargetFSpeed.S -= vel_diff;// (PathTest.Max_Vel - targetSpeed + 0.1);
 				Acceleration = GetSafeAcceleration((TargetFSpeed.S - EndFSpeed.S) / T);
@@ -342,10 +332,7 @@ std::vector<CartesianPoint> Trajectory::GenerateKeepInLaneTrajectory(PathPlanner
 	}
 
 	
-	//CPath.erase(CPath.begin());
 	BuiltPath.logpath( );
-	//LogCPath(CPath);
-
 	return CPath;
 }
 
@@ -378,11 +365,9 @@ std::vector<CartesianPoint> Trajectory::GenerateJMTLaneChangeTrajectory(PathPlan
 	if (Truncate)
 	{
 		DequeSize = BuiltPath.TrimPathDequeAtEnd(DequeSize - (SafeToTrimTo+1));  //cut to 5 points plus the current location
-
-
 	}
 
-	T = 1.9;
+	T = 2.0;
 	FrenetDescriptors lFDPt = BuiltPath.GetFrenetDescriptorsAt(DequeSize - 1);
 	FrenetDescriptors lFDPt1 = BuiltPath.GetFrenetDescriptorsAt(DequeSize - 2);
 	EndFPt = lFDPt.Displacement;
@@ -422,7 +407,7 @@ std::vector<CartesianPoint> Trajectory::GenerateJMTLaneChangeTrajectory(PathPlan
 		{
 			if (Truncate)
 			{
-				DequeSize = BuiltPath.TrimPathDequeAtEnd(DequeSize - 11);  //cut to 10 points plus the current location
+				DequeSize = BuiltPath.TrimPathDequeAtEnd(DequeSize - (SafeToTrimTo+1));  //cut to 5 points plus the current location
 			}
 			else
 			{
@@ -441,8 +426,6 @@ std::vector<CartesianPoint> Trajectory::GenerateJMTLaneChangeTrajectory(PathPlan
 		{
 			lPPt.FDPt = lFDPt;
 			lPPt.CPt = map2.FrenetToCartesian(lFDPt.Displacement);
-			//lPPt.CPt.X -= Offset.X;
-			//lPPt.CPt.Y -= Offset.Y;
 			DequeSize = BuiltPath.AddPathPoint(lPPt);
 		}
 		CPath = BuiltPath.GetCPath();
@@ -465,7 +448,7 @@ std::vector<CartesianPoint> Trajectory::GenerateJMTLaneChangeTrajectory(PathPlan
 				ReCalcCounter++;
 				_TL->warn("Recalculating Change Lane Trajectory because Max_Vel of {} exceeds Max velocity of {} mps. Dumping Path for debug:",
 					PathTest.Max_Vel, MaxSpeedMpS);
-				LogCPath(CPath);
+				BuiltPath.logpath( ); // LogCPath(CPath);
 				double vel_diff = PathTest.Max_Vel - MaxSpeedMpS > 1.0 ? (PathTest.Max_Vel - MaxSpeedMpS)*1.5 : 1.0;
 				TargetFSpeed.S -= vel_diff;// (PathTest.Max_Vel - targetSpeed + 0.1);
 				Acceleration = GetSafeAcceleration((TargetFSpeed.S - EndFSpeed.S) / T);
@@ -485,8 +468,6 @@ std::vector<CartesianPoint> Trajectory::GenerateJMTLaneChangeTrajectory(PathPlan
 	
 
 	BuiltPath.logpath( );
-	//LogCPath(CPath);
-	
 	return CPath;
 }
 

@@ -1,3 +1,7 @@
+//
+// Trajectory.h
+// Created by Anthony M Knight 30/01/2018
+//
 #ifndef TRAJECTORY_H
 #define TRAJECTORY_H
 
@@ -12,7 +16,7 @@
 #define G_FORCE_MPS 9.8
 
 const double JMTMaxSpeedMpH = 49.0;// 48.0;//
-const double JMTMaxSpeedinLaneChangeMpH = 46.0;//
+const double JMTMaxSpeedinLaneChangeMpH = 47.0;//
 
 struct Acc_Jerk
 {
@@ -67,8 +71,8 @@ private:
 	inline double MphToMetersPerSecond(double mphValue) { return mphValue * (1609.34 / 3600.0); }
 
 	const HighwayMap& map2;
-	const double MaxFwdAccelerationMpSsq = 0.25 * G_FORCE_MPS; /* 0.25 times force of gravity */
-	const double MaxBrakingAccelerationMpSsq = - 0.25 * G_FORCE_MPS; /* -0.25 times force of gravity */
+	const double MaxFwdAccelerationMpSsq = 0.225 * G_FORCE_MPS; /* 0.25 times force of gravity */
+	const double MaxBrakingAccelerationMpSsq = - 0.225 * G_FORCE_MPS; /* -0.25 times force of gravity */
 	const double SimulatorRunloopPeriod = 0.02;
 
 	PathTracking BuiltPath;

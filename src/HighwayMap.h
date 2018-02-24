@@ -1,5 +1,7 @@
 //
 // Created by Stanislav Olekhnovich on 13/10/2017.
+// see https://github.com/fspirit/path-planning-starter
+// Modified by Anthony M Knight 30/01/2018
 //
 // Used to load Highway data points and transform co-ords between Cartesian and Frenet
 
@@ -35,7 +37,7 @@ public:
     int NextWaypoint(CartesianPoint currentVehicleLocation) const;
     int ClosestWaypoint(CartesianPoint currentVehicleLocation) const;
 	std::vector<CartesianPoint> ConvertCurveMaintainSpeed(std::vector<FrenetPoint>& Path, CartesianPoint StartCPt, bool SpeedControl=true) const;
-
+	const double MaxS;
 private:
 	std::vector<double> mapPointsX;
 	std::vector<double> mapPointsY;

@@ -16,12 +16,12 @@ int NumIncrements = 20; // move from 30
 
 #include "RoadMap.h"
 
-int FwdLimit = 120;
+int FwdLimit = 180;
 int RevLimit = 80;
 
 
 // set up to create a grid which is divided into lanes, and 1 m increments.
-// looking forward 120 m (> 5 seconds at 50 mph)
+// looking forward 180 m (> 8 seconds at 50 mph)
 // and backwards 80 m
 
 
@@ -41,15 +41,53 @@ int RoadMap::CreateRoadMap() {
 	}
 
 	int localS;
-	for (auto& otherCar : ThisStepInput.OtherCars)
+	FrenetPoint OtherCarFPt;
+	for (OtherCar& otherCar : ThisStepInput.OtherCars)
 	{
+		OtherCarFPt = map.CartesianToFrenet(otherCar.LocationCartesian);
+
+		double EgoCarTmpS = EgoCar.S;
+		double EgoCarTmp2S = EgoCar.S;
+		if (EgoCar.S > 5000.0 and otherCar.LocationFrenet.S < 1000.0) EgoCarTmpS -= MAX_S;
+		if (EgoCar.S < 1000.0 and otherCar.LocationFrenet.S > 5000.0) EgoCarTmpS += MAX_S;
+		if (EgoCar.S > 5000.0 and OtherCarFPt.S < 1000.0) EgoCarTmp2S -= MAX_S;
+		if (EgoCar.S < 1000.0 and OtherCarFPt.S > 5000.0) EgoCarTmp2S += MAX_S;
+		if (200.0 > EgoCar.S or EgoCar.S > MAX_S - 300.0) // testing wrapping of frenet. 
+		{
+			_RML->info("EgoCar.S = {}, EgoCarTmpS = {}, Othercar id = {}, Cartesian coords {}, {}, Frenet Co-ords {} {} in lane {} at distance of {}.",
+				EgoCar.S, EgoCarTmpS,
+				otherCar.id, otherCar.LocationCartesian.X, otherCar.LocationCartesian.Y,
+				otherCar.LocationFrenet.S, otherCar.LocationFrenet.D, otherCar.LocationFrenet.GetLane( ),
+				otherCar.LocationFrenet.S - EgoCarTmpS);
+			_RML->info("EgoCar.S = {}, EgoCarTmpS = {}, Othercar id = {}, Cartesian coords {}, {}, Calc Fr Co-ords {} {} in lane {} at distance of {}.",
+				EgoCar.S, EgoCarTmp2S,
+				otherCar.id, otherCar.LocationCartesian.X, otherCar.LocationCartesian.Y,
+				OtherCarFPt.S, OtherCarFPt.D, OtherCarFPt.GetLane( ),
+				OtherCarFPt.S - EgoCarTmp2S);
+		}
 		for (int Interval = 0; Interval < NumIncrements; Interval++)
 		{
 			//assume that cars are remaining in lane for this approximation
 			//Todo improve to finding lane 
-			localS = floor((otherCar.LocationFrenet.S + otherCar.Speed2DMagnitudeMpS()*Interval*TimeIncrement - EgoCar.S + RevLimit));
+			//localS = floor((otherCar.LocationFrenet.S + otherCar.Speed2DMagnitudeMpS()*Interval*TimeIncrement - EgoCar.S + RevLimit));
+			// around location S=0 sometimes frenet locations of othercars get zeroed out in input so use value calculated from Cartesian
+			localS = floor((OtherCarFPt.S + otherCar.Speed2DMagnitudeMpS( )*Interval*TimeIncrement - EgoCarTmp2S + RevLimit));
 			if (localS > -1 and localS < (FwdLimit + RevLimit))
-				RoadMaps[OtherCarsLayer][Interval][otherCar.LocationFrenet.GetLane()][localS] = otherCar.id + 1;// need to offset so car 0 doesn't dispppear!
+			{
+				bool LaneFound = false;
+				//modify to put car into multiple lanes if it is within 2.75 m of other centerlane
+				for (int lane = 0; lane < 3; lane++)
+				{
+					//if (otherCar.LocationFrenet.WithinLane(lane))// can be true for more than one lane - watch out for D > 12.6
+					if (OtherCarFPt.WithinLane(lane))// can be true for more than one lane - watch out for D > 12.6
+					{
+						RoadMaps[OtherCarsLayer][Interval][lane][localS] = otherCar.id + 1;// need to offset id so car 0 doesn't dispppear!
+						LaneFound = true;
+					}
+				}
+				if (!LaneFound)
+					spdlog::get("console")->error("CreateRoadMap: No Lane found for car with D={}", OtherCarFPt.D);
+			}
 		}
 	}
 //#define PRINTPLAN 1
@@ -115,8 +153,8 @@ int RoadMap::check_lanes() {
 	MinLaneClearBACK.clear();
 
 	for (int lane = 0; lane < NumLanes; lane++) {
-		int minclearfwd = 120;
-		int minclearback = 80;
+		int minclearfwd = FwdLimit;// 120;
+		int minclearback = RevLimit;// 80;
 		for (int t = 0; t < NumIncrements; t++) {
 			if (minclearfwd > clearlanelengthsFWD.at(t).at(lane)) minclearfwd = clearlanelengthsFWD.at(t).at(lane);
 			if (minclearback > clearlanelengthsBACK.at(t).at(lane)) minclearback = clearlanelengthsBACK.at(t).at(lane);
@@ -136,82 +174,112 @@ int RoadMap::check_lanes() {
 
 
 
-int RoadMap::CheckForLaneChange() {
+int RoadMap::CheckForLaneChange( )
+{
 
 	int targetLane = -1;
-	int SafeRearClearance = 11;
+	int SafeRearClearance = 8;//11
+	int SafeFwdClearance = 15;//15
 
-	//if (clearlanelengthsFWD.at(0).at(EgoCar.GetLane()) < 50) {  //don't check for lanechange if still > 50 m clear ahead for next couple seconds
-	if ( MinLaneClearFWD.at(EgoCar.GetLane())< 60) {
-		//std::cout << "Now Fwd [" << clearlanelengthsFWD.at(0).at(0) <<", " << clearlanelengthsFWD.at(0).at(1) <<", " << clearlanelengthsFWD.at(0).at(2) << "] ";
-		//std::cout << "Back [" << MinLaneClearBACK.at(0) << ", " << MinLaneClearBACK.at(1) << ", " << MinLaneClearBACK.at(2) << "] " << std::endl;
+	  //don't check for lanechange if still > 60 m clear ahead for next couple seconds
 
-		if((EgoCar.GetLane() == 0) and (clearlanelengthsFWD.at(0).at(0) < clearlanelengthsFWD.at(0).at(1)) and (MinLaneClearBACK.at(1) > SafeRearClearance)) 
+	if (MinLaneClearFWD.at(EgoCar.GetLane( )) < 60)
+	{
+
+		if (EgoCar.GetLane( ) == 0)
+
 		{
-			targetLane = 1;
-			_RML->info("TargetLane set to 1 (clear to {} m) because lane 0 clearance is only {} m.",
-				clearlanelengthsFWD.at(0).at(1), clearlanelengthsFWD.at(0).at(0));
-		}
-		if (EgoCar.GetLane() == 1)
-		{
-			if ((clearlanelengthsFWD.at(0).at(1) < clearlanelengthsFWD.at(0).at(0)) or (clearlanelengthsFWD.at(0).at(1) < clearlanelengthsFWD.at(0).at(2)))
+			if ((MinLaneClearFWD.at(1) > SafeFwdClearance) and (MinLaneClearBACK.at(1) > SafeRearClearance))
 			{
-				if (clearlanelengthsFWD.at(0).at(2) < clearlanelengthsFWD.at(0).at(0))
+				if ((MinLaneClearFWD.at(0) < MinLaneClearFWD.at(1)))
 				{
-					if (MinLaneClearBACK.at(0) > SafeRearClearance) //(clearlanelengthsBACK.at(0).at(0) > 8)
-					{
-						targetLane = 0;
-						_RML->info("TargetLane set to 0 (clear to {} m) because lane 1 clearance is only {} m and lane 2 clearance is {} m.",
-							clearlanelengthsFWD.at(0).at(0), clearlanelengthsFWD.at(0).at(1), clearlanelengthsFWD.at(0).at(2));
-					}
-					else if ((clearlanelengthsFWD.at(0).at(1) < clearlanelengthsFWD.at(0).at(2)) and MinLaneClearBACK.at(2) > SafeRearClearance)
-					{
-						targetLane = 2;
-						_RML->info("TargetLane set to 2 (clear to {} m) because lane 1 clearance is only {} m and lane 0 clearance is {} m.",
-							clearlanelengthsFWD.at(0).at(2), clearlanelengthsFWD.at(0).at(1), clearlanelengthsFWD.at(0).at(0));
-
-					}
+					targetLane = 1;
+					_RML->info("A:TargetLane set to 1 (clear to {} m) because lane 0 clearance is only {} m.",
+						//clearlanelengthsFWD.at(0).at(1), clearlanelengthsFWD.at(0).at(0));
+						MinLaneClearFWD.at(1), MinLaneClearFWD.at(0));
 				}
-				else if (MinLaneClearBACK.at(2) > SafeRearClearance) 
+				else if (MinLaneClearFWD.at(1) > 40)
 				{
-					targetLane = 2;
-					_RML->info("TargetLane set to 2 (clear to {} m) because lane 1 clearance is only {} m and lane 0 clearance is {} m.",
-						clearlanelengthsFWD.at(0).at(2), clearlanelengthsFWD.at(0).at(1), clearlanelengthsFWD.at(0).at(0));
+					targetLane = 1;
+					_RML->info("B: TargetLane set to 1 (clear to {} m) because we prefer middle lane to lane {}.",
+						MinLaneClearFWD.at(1), EgoCar.GetLane( ));
+				}
+				else if ((MinLaneClearFWD.at(0) < 40) and (MinLaneClearFWD.at(2) > 55))
+				{
+					targetLane = 1;
+					_RML->info("C:TargetLane set to 1 (clear to {} m) because lane 2 clearance of {} m is a better choice than lane 0 clearance of {} m.",
+						MinLaneClearFWD.at(1), MinLaneClearFWD.at(2), MinLaneClearFWD.at(0));
 				}
 			}
-		}else if ((EgoCar.GetLane() == 2) and (clearlanelengthsFWD.at(0).at(2) < clearlanelengthsFWD.at(0).at(1)) and (MinLaneClearBACK.at(1) > SafeRearClearance)) 
-		{
-			targetLane = 1;
-			_RML->info("TargetLane set to 1 (clear to {} m) because lane 2 clearance is only {} m.",
-				clearlanelengthsFWD.at(0).at(1), clearlanelengthsFWD.at(0).at(2));
 		}
-		//experimental to try to avoid/get out of traps on side lanes and not move over earlier
-		else if ((EgoCar.GetLane() == 0) and (MinLaneClearFWD.at(1) > 20) and (MinLaneClearBACK.at(1) > SafeRearClearance)
-			and (MinLaneClearFWD.at(0) < 50) and (MinLaneClearFWD.at(2) > 55))
+
+		else if (EgoCar.GetLane( ) == 2)
+
 		{
-			targetLane = 1;
-			_RML->info("TargetLane set to 1 (clear to {} m) because lane 2 clearance of {} m is a better choice than lane 0 clearance of {} m.",
-				MinLaneClearFWD.at(1), MinLaneClearFWD.at(2), MinLaneClearFWD.at(0));
+			if ((MinLaneClearFWD.at(1) > SafeFwdClearance) and (MinLaneClearBACK.at(1) > SafeRearClearance))
+			{
+				if ((MinLaneClearFWD.at(2) < MinLaneClearFWD.at(1)))
+				{
+					targetLane = 1;
+					_RML->info("D:TargetLane set to 1 (clear to {} m) because lane 2 clearance is only {} m.",
+						//clearlanelengthsFWD.at(0).at(1), clearlanelengthsFWD.at(0).at(0));
+						MinLaneClearFWD.at(1), MinLaneClearFWD.at(2));
+				}
+				else if (MinLaneClearFWD.at(1) > 40)
+				{
+					targetLane = 1;
+					_RML->info("E: TargetLane set to 1 (clear to {} m) because we prefer middle lane to lane {}.",
+						MinLaneClearFWD.at(1), EgoCar.GetLane( ));
+				}
+				else if ((MinLaneClearFWD.at(2) < 40) and (MinLaneClearFWD.at(0) > 55))
+				{
+					targetLane = 1;
+					_RML->info("F:TargetLane set to 1 (clear to {} m) because lane 0 clearance of {} m is a better choice than lane 2 clearance of {} m.",
+						MinLaneClearFWD.at(1), MinLaneClearFWD.at(0), MinLaneClearFWD.at(2));
+				}
+			}
 		}
-		else if ((EgoCar.GetLane( ) == 2) and (MinLaneClearFWD.at(1) > 20) and (MinLaneClearBACK.at(1) > SafeRearClearance)
-			and (MinLaneClearFWD.at(2) < 50) and (MinLaneClearFWD.at(0) > 55))
+
+		else if (EgoCar.GetLane( ) == 1)
+
 		{
-			targetLane = 1;
-			_RML->info("TargetLane set to 1 (clear to {} m) because lane 0 clearance of {} m is a better choice than lane 2 clearance of {} m.",
-				MinLaneClearFWD.at(1), MinLaneClearFWD.at(0), MinLaneClearFWD.at(2));
+
+			//if ((clearlanelengthsFWD.at(0).at(1) < clearlanelengthsFWD.at(0).at(0)) or (clearlanelengthsFWD.at(0).at(1) < clearlanelengthsFWD.at(0).at(2)))
+			if ((MinLaneClearFWD.at(0) > MinLaneClearFWD.at(1)) or (MinLaneClearFWD.at(2) > MinLaneClearFWD.at(1)))
+			{
+				//if (clearlanelengthsFWD.at(0).at(2) < clearlanelengthsFWD.at(0).at(0))
+				if (MinLaneClearFWD.at(0) > MinLaneClearFWD.at(2))
+				{
+					if ((MinLaneClearBACK.at(0) > SafeRearClearance) and (MinLaneClearFWD.at(0) > SafeFwdClearance)) //(clearlanelengthsBACK.at(0).at(0) > 8)
+					{
+						targetLane = 0;
+						_RML->info("G:TargetLane set to 0 (clear to {} m) because lane 1 clearance is only {} m and lane 2 clearance is {} m.",
+							//clearlanelengthsFWD.at(0).at(0), clearlanelengthsFWD.at(0).at(1), clearlanelengthsFWD.at(0).at(2));
+							MinLaneClearFWD.at(0), MinLaneClearFWD.at(1), MinLaneClearFWD.at(2));
+					}
+				}
+				else
+				{
+					if ((MinLaneClearBACK.at(2) > SafeRearClearance) and (MinLaneClearFWD.at(2) > SafeFwdClearance))
+					{
+						targetLane = 2;
+						_RML->info("H:TargetLane set to 2 (clear to {} m) because lane 1 clearance is only {} m and lane 0 clearance is {} m.",
+							//clearlanelengthsFWD.at(0).at(2), clearlanelengthsFWD.at(0).at(1), clearlanelengthsFWD.at(0).at(0));
+							MinLaneClearFWD.at(2), MinLaneClearFWD.at(1), MinLaneClearFWD.at(0));
+					}
+				}
+			}
 		}
 	}
 	else
 	{
 		//move to middle lane whenever possible to give more options - hopefully won't cause too much weaving
-		//if ((EgoCar.GetLane() != 1) and (clearlanelengthsFWD.at(0).at(1) > 50) and (MinLaneClearBACK.at(1) > 10)) targetLane = 1;
-		if ((EgoCar.GetLane( ) != 1) and (MinLaneClearFWD.at(1) > 50) and (MinLaneClearBACK.at(1) > 10))
+		if ((EgoCar.GetLane( ) != 1) and (MinLaneClearFWD.at(1) > 60) and (MinLaneClearBACK.at(1) > SafeRearClearance))
 		{
 			targetLane = 1;
-			_RML->info("TargetLane set to 1 (clear to {} m) because we prefer middle lane to lane {}.",
-				MinLaneClearFWD.at(1), EgoCar.GetLane());
+			_RML->info("I: TargetLane set to 1 (clear to {} m) because we prefer middle lane to lane {}.",
+				MinLaneClearFWD.at(1), EgoCar.GetLane( ));
 		}
-		
 	}
 	if (targetLane == EgoCar.GetLane( )) targetLane = -1; //sanitycheck no lane change to own lane
 	if (targetLane > -1) PlanTargetLane = targetLane;
@@ -239,11 +307,24 @@ int RoadMap::CheckForSlowCarsAhead(double distance)
 		RevLimit + clearlanelengthsFWD.at(0).at(EgoCar.GetLane()));
 	_RML->info("RoadMap: Found OtherCarID {:d} at distance of {:d} m.",
 		OtherCarID - 1, clearlanelengthsFWD.at(0).at(EgoCar.GetLane()) );
-	std::cout << "Found OtherCarID = " << OtherCarID - 1 << " at distance of " << clearlanelengthsFWD.at(0).at(EgoCar.GetLane())  << "\r" << std::flush;
+	std::cout << "Found OtherCarID = " << OtherCarID - 1 << " at distance of " << clearlanelengthsFWD.at(0).at(EgoCar.GetLane())  <<
+		" m going " << ThisStepInput.OtherCars.at(OtherCarID - 1).Speed2DMagnitudeMpS( ) << " mps or " << 
+		ThisStepInput.OtherCars.at(OtherCarID - 1).Speed2DMagnitudeMpH() << " mph\r" << std::flush;
 	return OtherCarID - 1;
 }
 
-
+int RoadMap::CheckForSlowCarInOtherLane(int targetLane, double distance)
+{
+	if (MinLaneClearFWD.at(targetLane) > distance) return -1; //within time frame (2 secs, the car will be within buffer distance )
+	int OtherCarID = RoadMapDeck.at(OtherCarsLayer).at(0).at(targetLane).at(
+		RevLimit + clearlanelengthsFWD.at(0).at(targetLane));
+	_RML->info("RoadMap: Found OtherCarID {:d} at distance of {:d} m.",
+		OtherCarID - 1, clearlanelengthsFWD.at(0).at(targetLane));
+	std::cout << "Found OtherCarID = " << OtherCarID - 1 << " in targetLane at distance of " << clearlanelengthsFWD.at(0).at(targetLane) <<
+		" m going " << ThisStepInput.OtherCars.at(OtherCarID - 1).Speed2DMagnitudeMpS( ) << " mps or " <<
+		ThisStepInput.OtherCars.at(OtherCarID - 1).Speed2DMagnitudeMpH( ) << " mph\r" << std::flush;
+	return OtherCarID - 1;
+}
 
 //Try to pick best Target lane destination to try to get to in far distance maybe for A* target.
 //Initial thought is that it should generally be the middle lane,
@@ -283,3 +364,89 @@ int RoadMap::SetTarget() {
 
 	return(GoodLane);
 }
+
+//int RoadMap::CheckForLaneChange( )
+//{
+//
+//	int targetLane = -1;
+//	int SafeRearClearance = 8;//11
+//	int SafeFwdClearance = 15;//15
+//
+//							  //if (clearlanelengthsFWD.at(0).at(EgoCar.GetLane()) < 50) {  //don't check for lanechange if still > 50 m clear ahead for next couple seconds
+//	if (MinLaneClearFWD.at(EgoCar.GetLane( ))< 60)
+//	{
+//		//std::cout << "Now Fwd [" << clearlanelengthsFWD.at(0).at(0) <<", " << clearlanelengthsFWD.at(0).at(1) <<", " << clearlanelengthsFWD.at(0).at(2) << "] ";
+//		//std::cout << "Back [" << MinLaneClearBACK.at(0) << ", " << MinLaneClearBACK.at(1) << ", " << MinLaneClearBACK.at(2) << "] " << std::endl;
+//
+//		if ((EgoCar.GetLane( ) == 0) and (clearlanelengthsFWD.at(0).at(0) < clearlanelengthsFWD.at(0).at(1)) and (MinLaneClearBACK.at(1) > SafeRearClearance))
+//		{
+//			targetLane = 1;
+//			_RML->info("TargetLane set to 1 (clear to {} m) because lane 0 clearance is only {} m.",
+//				clearlanelengthsFWD.at(0).at(1), clearlanelengthsFWD.at(0).at(0));
+//		}
+//		if (EgoCar.GetLane( ) == 1)
+//		{
+//			if ((clearlanelengthsFWD.at(0).at(1) < clearlanelengthsFWD.at(0).at(0)) or (clearlanelengthsFWD.at(0).at(1) < clearlanelengthsFWD.at(0).at(2)))
+//			{
+//				if (clearlanelengthsFWD.at(0).at(2) < clearlanelengthsFWD.at(0).at(0))
+//				{
+//					if (MinLaneClearBACK.at(0) > SafeRearClearance) //(clearlanelengthsBACK.at(0).at(0) > 8)
+//					{
+//						targetLane = 0;
+//						_RML->info("TargetLane set to 0 (clear to {} m) because lane 1 clearance is only {} m and lane 2 clearance is {} m.",
+//							clearlanelengthsFWD.at(0).at(0), clearlanelengthsFWD.at(0).at(1), clearlanelengthsFWD.at(0).at(2));
+//					}
+//					else if ((clearlanelengthsFWD.at(0).at(1) < clearlanelengthsFWD.at(0).at(2)) and MinLaneClearBACK.at(2) > SafeRearClearance)
+//					{
+//						targetLane = 2;
+//						_RML->info("TargetLane set to 2 (clear to {} m) because lane 1 clearance is only {} m and lane 0 clearance is {} m.",
+//							clearlanelengthsFWD.at(0).at(2), clearlanelengthsFWD.at(0).at(1), clearlanelengthsFWD.at(0).at(0));
+//
+//					}
+//				}
+//				else if (MinLaneClearBACK.at(2) > SafeRearClearance)
+//				{
+//					targetLane = 2;
+//					_RML->info("TargetLane set to 2 (clear to {} m) because lane 1 clearance is only {} m and lane 0 clearance is {} m.",
+//						clearlanelengthsFWD.at(0).at(2), clearlanelengthsFWD.at(0).at(1), clearlanelengthsFWD.at(0).at(0));
+//				}
+//			}
+//		}
+//		else if ((EgoCar.GetLane( ) == 2) and (clearlanelengthsFWD.at(0).at(2) < clearlanelengthsFWD.at(0).at(1)) and (MinLaneClearBACK.at(1) > SafeRearClearance))
+//		{
+//			targetLane = 1;
+//			_RML->info("TargetLane set to 1 (clear to {} m) because lane 2 clearance is only {} m.",
+//				clearlanelengthsFWD.at(0).at(1), clearlanelengthsFWD.at(0).at(2));
+//		}
+//		//experimental to try to avoid/get out of traps on side lanes and not move over earlier
+//		else if ((EgoCar.GetLane( ) == 0) and (MinLaneClearFWD.at(1) > SafeFwdClearance) and (MinLaneClearBACK.at(1) > SafeRearClearance)
+//			and (MinLaneClearFWD.at(0) < 30) and (MinLaneClearFWD.at(2) > 55))
+//		{
+//			targetLane = 1;
+//			_RML->info("TargetLane set to 1 (clear to {} m) because lane 2 clearance of {} m is a better choice than lane 0 clearance of {} m.",
+//				MinLaneClearFWD.at(1), MinLaneClearFWD.at(2), MinLaneClearFWD.at(0));
+//		}
+//		else if ((EgoCar.GetLane( ) == 2) and (MinLaneClearFWD.at(1) > SafeFwdClearance) and (MinLaneClearBACK.at(1) > SafeRearClearance)
+//			and (MinLaneClearFWD.at(2) < 30) and (MinLaneClearFWD.at(0) > 55))
+//		{
+//			targetLane = 1;
+//			_RML->info("TargetLane set to 1 (clear to {} m) because lane 0 clearance of {} m is a better choice than lane 2 clearance of {} m.",
+//				MinLaneClearFWD.at(1), MinLaneClearFWD.at(0), MinLaneClearFWD.at(2));
+//		}
+//	}
+//	else
+//	{
+//		//move to middle lane whenever possible to give more options - hopefully won't cause too much weaving
+//		//if ((EgoCar.GetLane() != 1) and (clearlanelengthsFWD.at(0).at(1) > 50) and (MinLaneClearBACK.at(1) > 10)) targetLane = 1;
+//		if ((EgoCar.GetLane( ) != 1) and (MinLaneClearFWD.at(1) > 50) and (MinLaneClearBACK.at(1) > SafeRearClearance))
+//		{
+//			targetLane = 1;
+//			_RML->info("TargetLane set to 1 (clear to {} m) because we prefer middle lane to lane {}.",
+//				MinLaneClearFWD.at(1), EgoCar.GetLane( ));
+//		}
+//
+//	}
+//	if (targetLane == EgoCar.GetLane( )) targetLane = -1; //sanitycheck no lane change to own lane
+//	if (targetLane > -1) PlanTargetLane = targetLane;
+//	return (targetLane);
+//}

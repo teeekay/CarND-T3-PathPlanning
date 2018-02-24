@@ -1,5 +1,6 @@
 //
 // Created by Stanislav Olekhnovich on 12/10/2017.
+// see https://github.com/fspirit/path-planning-starter
 //
 
 #include "KeepLanePathPlanner.h"

@@ -1,5 +1,7 @@
 //
 // Created by Stanislav Olekhnovich on 13/10/2017.
+// see https://github.com/fspirit/path-planning-starter
+// Modified by Anthony M Knight 30/01/2018
 //
 
 //#include <thread>
@@ -10,7 +12,8 @@
 #include <iostream>
 #include "HighwayMap.h"
 
-HighwayMap::HighwayMap(const std::string &highwayMapCsvPath)
+HighwayMap::HighwayMap(const std::string &highwayMapCsvPath) :
+	MaxS(MAX_S)
 {
 	
 	try
@@ -145,14 +148,66 @@ void HighwayMap::LoadSSplines() {
 
 	//spline values of X, Y, DX, DY against S., then can retrieve good interpolation between waypoints!
 
-	// Reload initial pt as endpoint when frenet loops round to beginning
+	// Reload initial pt as endpoint when frenet loops round to beginning + more points at each end to
+	// make sure the spline curves match when passing from S< 6945 to S>0.
 	double endpoint = MAX_S;// 6945.554;
-	mapPointsS.push_back(endpoint);
-	mapPointsX.push_back(mapPointsX.at(0));
-	mapPointsY.push_back(mapPointsY.at(0));
-	mapPointsDX.push_back(mapPointsDX.at(0));
-	mapPointsDY.push_back(mapPointsDY.at(0));
-	mapPointsTheta.push_back(mapPointsTheta.at(0));  //watch for wraparound on this
+	for (int i = 1; i < 4; i++)
+	{
+		double  SValue = mapPointsS.at(mapPointsS.size( ) - i) - endpoint;
+		mapPointsS.emplace(mapPointsS.begin( ), SValue);
+		double  XValue = mapPointsX.at(mapPointsX.size( ) - i);
+		mapPointsX.emplace(mapPointsX.begin( ), XValue);
+		double  YValue = mapPointsY.at(mapPointsY.size( ) - i);
+		mapPointsY.emplace(mapPointsY.begin(), YValue);
+		double  DXValue = mapPointsDX.at(mapPointsDX.size( ) - i);
+		mapPointsDX.emplace(mapPointsDX.begin( ), DXValue);
+		double  DYValue = mapPointsDY.at(mapPointsDY.size( ) - i);
+		mapPointsDY.emplace(mapPointsDY.begin( ), DYValue);
+		double  ThetaValue = mapPointsTheta.at(mapPointsTheta.size( ) - i);
+		mapPointsTheta.emplace(mapPointsTheta.begin( ), ThetaValue);
+	}
+	
+	for (int i = 1; i < 5; i++)
+	{
+		double SValue = mapPointsS.at(2 + i) + endpoint;
+		mapPointsS.emplace(mapPointsS.end( ), SValue);
+	}
+	mapPointsX.insert(mapPointsX.end( ), mapPointsX.begin( ) + 3, mapPointsX.begin( ) + 7);
+	mapPointsY.insert(mapPointsY.end( ), mapPointsY.begin( ) + 3, mapPointsY.begin( ) + 7);
+	mapPointsDX.insert(mapPointsDX.end( ), mapPointsDX.begin( ) + 3, mapPointsDX.begin( ) + 7);
+	mapPointsDY.insert(mapPointsDY.end( ), mapPointsDY.begin( ) + 3, mapPointsDY.begin( ) + 7);
+	mapPointsTheta.insert(mapPointsTheta.end( ), mapPointsTheta.begin( ) + 3, mapPointsTheta.begin( ) + 7);  //watch for wraparound on this
+
+
+	spdlog::get("console")->info("size of MapPoints vectors: S {} X {} Y {} DX {} DY {} Theta {} ",
+		mapPointsS.size( ), mapPointsX.size( ), mapPointsY.size( ), mapPointsDX.size( ),
+		mapPointsDY.size( ), mapPointsTheta.size( ));
+/*
+	std::string strS = "S values are { ";
+	std::string strX = "X values are { ";
+	std::string strY = "Y values are { ";
+	for (int j = 0; j< mapPointsS.size(); j++)
+	{
+		strS.append(std::to_string(mapPointsS.at(j)));
+		strS.append(", ");
+		strX.append(std::to_string(mapPointsX.at(j)));
+		strX.append(", ");
+		strY.append(std::to_string(mapPointsY.at(j)));
+		strY.append(", ");
+	}
+	for (int i = 0; i < 2; i++)
+	{
+		strS.pop_back( );
+		strX.pop_back( );
+		strY.pop_back( );
+	}
+	strS.append(" }");
+	strX.append(" }");
+	strY.append(" }");
+	spdlog::get("console")->info("{}", strS);
+	spdlog::get("console")->info("{}", strX);
+	spdlog::get("console")->info("{}", strY);
+*/
 
 	//Set up splines
 	SplineFrenetSToX.set_points(mapPointsS, mapPointsX);
@@ -167,7 +222,6 @@ void HighwayMap::LoadSSplines() {
 		DiscreteY.push_back(SplineFrenetSToY(s));
 		DiscreteS.push_back(s);
 		DiscreteTheta.push_back(SplineFrenetSToTheta(s));
-
 	}
 }
 

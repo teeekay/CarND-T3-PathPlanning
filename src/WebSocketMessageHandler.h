@@ -1,5 +1,7 @@
-//
+// WebSocketMessageHandler.h
 // Created by Stanislav Olekhnovich on 02/08/2017.
+// see https://github.com/fspirit/path-planning-starter
+// Customized by Anthony Knight on 17/01/2018
 //
 
 #ifndef PF_WEBSOCKETMESSAGEHANDLER_H

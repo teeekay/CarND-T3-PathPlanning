@@ -1,5 +1,7 @@
 //
 // Created by Stanislav Olekhnovich on 16/10/2017.
+// see https://github.com/fspirit/path-planning-starter
+// Modified by Anthony M Knight 30/01/2018
 //
 
 #ifndef PATH_PLANNING_PATHPLANNER_H

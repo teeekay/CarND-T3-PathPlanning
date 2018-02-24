@@ -1,5 +1,6 @@
 //
 // Created by Stanislav Olekhnovich on 17/10/2017.
+// see https://github.com/fspirit/path-planning-starter
 // Updated by Anthony M Knight on 25/01/2017
 //
 

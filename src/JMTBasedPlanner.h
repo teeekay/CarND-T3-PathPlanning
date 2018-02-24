@@ -1,4 +1,7 @@
-
+//
+// JMTBasedPlanner.h
+// Created by Anthony M Knight 30/01/2018
+//
 #ifndef PATH_PLANNING_JMTBASEDPLANNER_H
 #define PATH_PLANNING_JMTBASEDPLANNER_H
 
@@ -12,16 +15,15 @@
 
 
 
-const double JMTCarinfrontbuffer = 19.0;//15.0//20.0  //4 means you've hit it!
+const double JMTCarinfrontbuffer = 20.0;//19.0//20.0  //4 means you've hit it!
 
 enum EGOState {
 	Uninitialized,
 	DriveInLane,
-	ChangeLane,
-	MatchVelocity
+	ChangeLane
 };
 
-#define KEEP_LANE_MINIMUM_TIME 2000 //3000 mS
+#define KEEP_LANE_MINIMUM_TIME 2000 /// in mS
 
 class JMTBasedPlanner : public PathPlanner, public Trajectory
 {

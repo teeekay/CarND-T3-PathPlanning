@@ -1,11 +1,16 @@
-#define TMK_SETUP
-#ifdef TMK_SETUP
+//
+// main.cpp
+// Created by Stanislav Olekhnovich on 13/10/2017.
+// see https://github.com/fspirit/path-planning-starter
+// Modified by Anthony M Knight 30/01/2018
+//
+
+//#define TMK_SETUP
 #include <uWS/uWS.h>
+#ifdef TMK_SETUP
 #include <eigen3/Eigen/Core>
 #else
-#include <uWS/uWS.h>
 #include "Eigen-3.3/Eigen/Core"
-//#include <Eigen/Core>
 #endif
 #include <fstream>
 #include <chrono>
@@ -26,11 +31,7 @@
 #define MAPFILE "../data/highway_map.csv"
 #endif
 
-
 #include <memory>
-
-
-
 
 //#define KEEPLANE_PATHPLANNER
 //#define SPLINE_PATHPLANNER
@@ -50,15 +51,7 @@
 
 #include "WebSocketMessageHandler.h"
 
-//using namespace std;
-
-//using std::string;
-//using std::cout;
-//using std::endl;
-//using std::cerr;
-
 const int StartingLane = 1;
-
 
 void SetupLogging( )
 {
@@ -113,15 +106,6 @@ int main(int argc, char * argv[])
 	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 
 	PATHPLANNER pathPlanner(map, StartingLane);
-//#ifdef KEEPLANE_PATHPLANNER
-//	  KeepLanePathPlanner pathPlanner(map, StartingLane);
-//#else
-//#ifdef SPLINE_PATHPLANNER
-//	  SimpleSplineBasedPlanner pathPlanner(map, StartingLane);
-//#else
-//	JMTBasedPlanner pathPlanner(map, StartingLane);
-//#endif
-//#endif
 
 	WebSocketMessageHandler handler(pathPlanner);
 
