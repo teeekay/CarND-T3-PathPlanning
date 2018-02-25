@@ -45,44 +45,51 @@ public:
 	
 	std::vector<CartesianPoint> InitiateTrajectory(PathPlannerInput input);
 	std::vector<CartesianPoint> GenerateJMTLaneChangeTrajectory(PathPlannerInput input, int TargetLane, double DesiredVelocity, bool truncate=false);
-	std::vector<CartesianPoint> OldGenerateJMTLaneChangeTrajectory(PathPlannerInput input, int TargetLane, double DesiredVelocity, bool truncate = false);
 	std::vector<CartesianPoint> GenerateKeepInLaneTrajectory(PathPlannerInput input, double DesiredVelocity , bool truncate=false,
 		double FinalFPtDOffset=0.0);
 	std::vector<CartesianPoint> RecalcTrajectory(PathPlannerInput input, double DOffset);
-	std::vector<CartesianPoint> OldGenerateKeepInLaneTrajectory(PathPlannerInput input, double DesiredVelocity, bool truncate = false);
 	double GetAcceleration();
 	FrenetPoint GetFrenetLocation(int pathsize);
 	void LogFPath(std::vector<FrenetPoint> FPath);
 	void LogCPath(std::vector<CartesianPoint> CPath);
 	const double MaxSpeedInLaneChangeMpS;
 	const double MaxSpeedMpS;
-private:
 
-	std::vector<CartesianPoint> TrimPath(std::vector<CartesianPoint> &Path, int NumberPoints);
-	std::vector<FrenetPoint> GenerateJMTPath(FrenetPoint LastFPt, FrenetPoint DestFPt, FrenetPoint LastSpeed, FrenetPoint TargetSpeed, double T,
-		                             bool GenerateZero = false, FrenetPoint LastAccel={ 0.0,0.0 }, FrenetPoint TargetAccel={ 0.0,0.0 });
+private:
 	std::vector<FrenetDescriptors> GenerateJMTDPath(FrenetPoint LastFPt, FrenetPoint DestFPt, FrenetPoint LastSpeed, FrenetPoint TargetSpeed, double T,
 		                             bool GenerateZero = false, FrenetPoint LastAccel={ 0.0,0.0 }, FrenetPoint TargetAccel={ 0.0,0.0 });
 
-	void OffsetPath(std::vector<CartesianPoint> &CPath, CartesianPoint LastCPt);
-	CartesianPoint GetOffset(CartesianPoint CalcCPt, CartesianPoint KnownCPt);
-	FrenetPoint GetFinalFAccel(std::vector<CartesianPoint> const & CPath);
+	Acc_Jerk CheckPath(std::vector<CartesianPoint> Path, double time_increment, double v_init = 0.0, double a_init = 0.0);
 	
 	inline double MphToMetersPerSecond(double mphValue) { return mphValue * (1609.34 / 3600.0); }
 
-	const HighwayMap& map2;
+	double GetSafeAcceleration(double accel);
+	
 	const double MaxFwdAccelerationMpSsq = 0.225 * G_FORCE_MPS; /* 0.25 times force of gravity */
-	const double MaxBrakingAccelerationMpSsq = - 0.225 * G_FORCE_MPS; /* -0.25 times force of gravity */
+	const double MaxBrakingAccelerationMpSsq = -0.225 * G_FORCE_MPS; /* -0.25 times force of gravity */
 	const double SimulatorRunloopPeriod = 0.02;
 
+	const HighwayMap& map2;
 	PathTracking BuiltPath;
 
 	double Acceleration;
 	double MaxVelocityReported;
-	FrenetPoint LastIterEndpointFPt;
-	double GetSafeAcceleration(double accel);
-	Acc_Jerk CheckPath(std::vector<CartesianPoint> Path, double time_increment, double v_init = 0.0, double a_init = 0.0);
+	
+    //spdlog pointer
 	std::shared_ptr<spdlog::logger> _TL;
+
+	// functions no longer used
+	//std::vector<CartesianPoint> TrimPath(std::vector<CartesianPoint> &Path, int NumberPoints);
+
+	//std::vector<FrenetPoint> GenerateJMTPath(FrenetPoint LastFPt, FrenetPoint DestFPt, FrenetPoint LastSpeed, FrenetPoint TargetSpeed, double T,
+	//	bool GenerateZero = false, FrenetPoint LastAccel = { 0.0,0.0 }, FrenetPoint TargetAccel = { 0.0,0.0 });
+
+	//void OffsetPath(std::vector<CartesianPoint> &CPath, CartesianPoint LastCPt);
+
+	//CartesianPoint GetOffset(CartesianPoint CalcCPt, CartesianPoint KnownCPt);
+
+	//FrenetPoint GetFinalFAccel(std::vector<CartesianPoint> const & CPath);
+	//FrenetPoint LastIterEndpointFPt;
 };
 
 
