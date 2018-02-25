@@ -34,8 +34,8 @@ public:
     HighwayMap(const std::string& highwayMapCsvPath);
     CartesianPoint FrenetToCartesian(const FrenetPoint& frenetPoint) const;
     FrenetPoint CartesianToFrenet(const CartesianPoint& cartesianPoint) const;
-    int NextWaypoint(CartesianPoint currentVehicleLocation) const;
-    int ClosestWaypoint(CartesianPoint currentVehicleLocation) const;
+    int NextWaypoint(CartesianPoint CurrentLocationCPt) const;
+    int ClosestWaypoint(CartesianPoint CurrentLocationCPt) const;
 	std::vector<CartesianPoint> ConvertCurveMaintainSpeed(std::vector<FrenetPoint>& Path, CartesianPoint StartCPt, bool SpeedControl=true) const;
 	const double MaxS;
 private:
