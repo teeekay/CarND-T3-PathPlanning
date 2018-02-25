@@ -78,18 +78,6 @@ private:
     //spdlog pointer
 	std::shared_ptr<spdlog::logger> _TL;
 
-	// functions no longer used
-	//std::vector<CartesianPoint> TrimPath(std::vector<CartesianPoint> &Path, int NumberPoints);
-
-	//std::vector<FrenetPoint> GenerateJMTPath(FrenetPoint LastFPt, FrenetPoint DestFPt, FrenetPoint LastSpeed, FrenetPoint TargetSpeed, double T,
-	//	bool GenerateZero = false, FrenetPoint LastAccel = { 0.0,0.0 }, FrenetPoint TargetAccel = { 0.0,0.0 });
-
-	//void OffsetPath(std::vector<CartesianPoint> &CPath, CartesianPoint LastCPt);
-
-	//CartesianPoint GetOffset(CartesianPoint CalcCPt, CartesianPoint KnownCPt);
-
-	//FrenetPoint GetFinalFAccel(std::vector<CartesianPoint> const & CPath);
-	//FrenetPoint LastIterEndpointFPt;
 };
 
 

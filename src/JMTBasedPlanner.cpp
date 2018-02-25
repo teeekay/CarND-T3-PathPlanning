@@ -166,7 +166,7 @@ std::vector<CartesianPoint> JMTBasedPlanner::GeneratePath(PathPlannerInput input
 				OutputPath = { OldPath };
 				break;
 			}
-			targetSpeed = 0.98 * input.OtherCars.at(car_id).Speed2DMagnitudeMpS();  //was .99
+			targetSpeed = 0.95 * input.OtherCars.at(car_id).Speed2DMagnitudeMpS();  //was .99
 			if (targetSpeed > Trajectory::MaxSpeedMpS) targetSpeed = Trajectory::MaxSpeedMpS;
 			_JPL->info("found Othercar id = {} with velocity {:3.2f} at distance of {:3.2f} m.",
 				    input.OtherCars.at(car_id).id, input.OtherCars.at(car_id).Speed2DMagnitudeMpS(), gap);

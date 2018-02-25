@@ -26,14 +26,19 @@ class PathTracking
 {
 public:
 	PathTracking();
+
 	int AddPathPoint(PathPoint PPt); //add point returns size of deque
-//	int AddJMTDescriptors(std::vector<FrenetDescriptors> FDPts); //add frenet path calculate Cartesian values
-	FrenetPoint GetFrenetSpeed(int PathIndex);
-	FrenetDescriptors GetFrenetDescriptorsAt(int PathIndex);
+
 	int TrimPathDequeAtStart(int ElementsToTrim);
 	int TrimPathDequeAtEnd(int ElementsToTrim);
+
+	FrenetDescriptors GetFrenetDescriptorsAt(int PathIndex);
+	FrenetPoint GetFrenetSpeed(int PathIndex);
+
 	std::vector<CartesianPoint> GetCPath();
+
 	int size();
+
 	int logpath( );
 private:
 	std::deque<PathPoint> PathDeque;

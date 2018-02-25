@@ -108,6 +108,8 @@ int PathTracking::TrimPathDequeAtEnd(int ElementsToTrim)
 	return PathDeque.size();
 }
 
+
+// log out Frenet and Cartesian co-ords stored in Deque
 int PathTracking::logpath( )
 {
 	int i = 0;

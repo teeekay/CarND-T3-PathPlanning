@@ -15,7 +15,7 @@
 
 
 
-const double JMTCarinfrontbuffer = 20.0;//19.0//20.0  //4 means you've hit it!
+const double JMTCarinfrontbuffer = 25.0;//19.0//20.0  //4 means you've hit it!
 
 enum EGOState {
 	Uninitialized,

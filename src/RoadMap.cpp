@@ -20,23 +20,26 @@ int FwdLimit = 180;
 int RevLimit = 80;
 
 
-// set up to create a grid which is divided into lanes, and 1 m increments.
+// set up to create a grid which is divided into 3 lanes, at 1 m increments.
 // looking forward 180 m (> 8 seconds at 50 mph)
 // and backwards 80 m
+// over NumIncrements of time
+// with 1 layer for the EGOCar position, and 1 layer for the other car positions.
 
 
 int RoadMap::CreateRoadMap() {
 
 	double EgoPosition = double(RevLimit);
 	EgoSpeedMpS = (ThisStepInput.SpeedMpS < 1.0) ? 2.0 : ThisStepInput.SpeedMpS;
-
-	//std::vector< std::vector <int>>RoadMapNow(NumLanes, std::vector<int>(FwdLimit + RevLimit, 0)); // lane;
+	EgoInTime.clear( );
+	
 	std::vector<std::vector<std::vector< std::vector <int>>>> RoadMaps(2, std::vector<std::vector<std::vector<int>>>
 		(NumIncrements, std::vector<std::vector<int>>(NumLanes, std::vector<int>(FwdLimit + RevLimit, 0))));
 
 	for (int Interval = 0; Interval < NumIncrements; Interval++)
 	{
 		int EgoNow = floor(EgoPosition + (EgoSpeedMpS * Interval * TimeIncrement));
+		EgoInTime.push_back(EgoNow);
 		RoadMaps[EgoCarLayer][Interval][EgoCar.GetLane()][EgoNow] = -1;  // Assign Ego Car ID -1 on Plan
 	}
 
@@ -44,6 +47,7 @@ int RoadMap::CreateRoadMap() {
 	FrenetPoint OtherCarFPt;
 	for (OtherCar& otherCar : ThisStepInput.OtherCars)
 	{
+		//more reliable than the provided Frenet co-ords which occasionally are blank (near S = 0).
 		OtherCarFPt = map.CartesianToFrenet(otherCar.LocationCartesian);
 
 		double EgoCarTmpS = EgoCar.S;
@@ -54,11 +58,11 @@ int RoadMap::CreateRoadMap() {
 		if (EgoCar.S < 1000.0 and OtherCarFPt.S > 5000.0) EgoCarTmp2S += MAX_S;
 		if (200.0 > EgoCar.S or EgoCar.S > MAX_S - 300.0) // testing wrapping of frenet. 
 		{
-			_RML->info("EgoCar.S = {}, EgoCarTmpS = {}, Othercar id = {}, Cartesian coords {}, {}, Frenet Co-ords {} {} in lane {} at distance of {}.",
-				EgoCar.S, EgoCarTmpS,
-				otherCar.id, otherCar.LocationCartesian.X, otherCar.LocationCartesian.Y,
-				otherCar.LocationFrenet.S, otherCar.LocationFrenet.D, otherCar.LocationFrenet.GetLane( ),
-				otherCar.LocationFrenet.S - EgoCarTmpS);
+//			_RML->info("EgoCar.S = {}, EgoCarTmpS = {}, Othercar id = {}, Cartesian coords {}, {}, Frenet Co-ords {} {} in lane {} at distance of {}.",
+//				EgoCar.S, EgoCarTmpS,
+//				otherCar.id, otherCar.LocationCartesian.X, otherCar.LocationCartesian.Y,
+//				otherCar.LocationFrenet.S, otherCar.LocationFrenet.D, otherCar.LocationFrenet.GetLane( ),
+//				otherCar.LocationFrenet.S - EgoCarTmpS);
 			_RML->info("EgoCar.S = {}, EgoCarTmpS = {}, Othercar id = {}, Cartesian coords {}, {}, Calc Fr Co-ords {} {} in lane {} at distance of {}.",
 				EgoCar.S, EgoCarTmp2S,
 				otherCar.id, otherCar.LocationCartesian.X, otherCar.LocationCartesian.Y,
@@ -81,6 +85,8 @@ int RoadMap::CreateRoadMap() {
 					//if (otherCar.LocationFrenet.WithinLane(lane))// can be true for more than one lane - watch out for D > 12.6
 					if (OtherCarFPt.WithinLane(lane))// can be true for more than one lane - watch out for D > 12.6
 					{
+						//cars can't pass the EgoCar - try this to stop them from showing up ahead of EgoCar
+						if (lane == EgoCar.GetLane( ) and OtherCarFPt.S < EgoCar.S and localS > EgoInTime.at(Interval)) localS = EgoInTime.at(Interval) - 4;
 						RoadMaps[OtherCarsLayer][Interval][lane][localS] = otherCar.id + 1;// need to offset id so car 0 doesn't dispppear!
 						LaneFound = true;
 					}
@@ -132,7 +138,6 @@ int RoadMap::check_lanes() {
 	
 	std::vector <int>temp(NumLanes, 0);
 	
-	
 	for (int t = 0; t < NumIncrements; t++) {
 		clearlanelengthsFWD.push_back(temp);
 		clearlanelengthsBACK.push_back(temp);
@@ -140,10 +145,8 @@ int RoadMap::check_lanes() {
 
 		for (int lane = 0; lane < NumLanes; lane++) {
 			auto itFWD = std::find_if(RoadMapNow.at(t).at(lane).begin() + RevLimit + EgoOffset, RoadMapNow.at(t).at(lane).end(), [](int x) { return x > 0; });
-//			auto itBACK = std::find_if(RoadMapNow.at(t).at(lane).rbegin() + (FwdLimit - EgoOffset - 1), RoadMapNow.at(t).at(lane).rend(), [](int x) { return x > 0; });
 			auto itBACK = std::find_if(RoadMapNow.at(t).at(lane).rbegin( ) + (FwdLimit - EgoOffset), RoadMapNow.at(t).at(lane).rend( ), [ ](int x) { return x > 0; });
 			clearlanelengthsFWD.at(t).at(lane) = std::distance(RoadMapNow.at(t).at(lane).begin() + RevLimit + EgoOffset, itFWD);
-			//clearlanelengthsBACK.at(t).at(lane) = -(std::distance(itBACK, RoadMapNow.at(t).at(lane).rbegin() + (FwdLimit - EgoOffset - 1)));
 			clearlanelengthsBACK.at(t).at(lane) = -(std::distance(itBACK, RoadMapNow.at(t).at(lane).rbegin( ) + (FwdLimit - EgoOffset)));
 		}
 
@@ -178,8 +181,8 @@ int RoadMap::CheckForLaneChange( )
 {
 
 	int targetLane = -1;
-	int SafeRearClearance = 8;//11
-	int SafeFwdClearance = 15;//15
+	int SafeRearClearance = 6;//11
+	int SafeFwdClearance = 16;//15
 
 	  //don't check for lanechange if still > 60 m clear ahead for next couple seconds
 
@@ -331,39 +334,39 @@ int RoadMap::CheckForSlowCarInOtherLane(int targetLane, double distance)
 //but move to another lane if significantly clearer looking back from destination
 // Test at 1 second or t_steps = 10
 //TODO: maybe we should test for all timesteps?
-int RoadMap::SetTarget() {
-
-	int t_steps = 10;
-	int TmpTargetLane = 1;
-	std::vector<int> clearlanelengthsBACK(NumLanes);
-	std::vector< std::vector <int>> RoadMapNow = RoadMapDeck[OtherCarsLayer][t_steps];
-
-
-	int GoodLane = -1;
-	int Horizon = 0;
-	int MaxClearDistance = 15;
-	for (int StepsBack = 0; StepsBack < 3 and GoodLane<0; StepsBack++) {
-		for (int Lane = 0; Lane < NumLanes; Lane++) {
-
-			auto itBACK = std::find_if(RoadMapNow[Lane].rbegin() + StepsBack * 15, RoadMapNow[Lane].rend(), [](int x) { return x > 0; });
-			clearlanelengthsBACK[Lane] = std::distance(itBACK, RoadMapNow[Lane].rbegin() + StepsBack * 15);
-			if (-clearlanelengthsBACK.at(Lane) > MaxClearDistance) {
-				MaxClearDistance = -clearlanelengthsBACK.at(Lane);
-				GoodLane = Lane;
-				Horizon = FwdLimit - (StepsBack * 15);
-			}
-			std::cout << "At time = " << double(t_steps) * TimeIncrement << " Secs: clear back "
-				<< -clearlanelengthsBACK[Lane] << " m from horizon in lane " << Lane << ".  with "
-				<< StepsBack * 15 << " steps back." << std::endl;
-		}
-	}
-
-	GoalLane = GoodLane;
-	GoalHorizon = Horizon;
-	std::cout << "chose Target of Lane " << GoodLane << " at Horizon of " << Horizon << "m." << std::endl;
-
-	return(GoodLane);
-}
+//int RoadMap::SetTarget() {
+//
+//	int t_steps = 10;
+//	int TmpTargetLane = 1;
+//	std::vector<int> clearlanelengthsBACK(NumLanes);
+//	std::vector< std::vector <int>> RoadMapNow = RoadMapDeck[OtherCarsLayer][t_steps];
+//
+//
+//	int GoodLane = -1;
+//	int Horizon = 0;
+//	int MaxClearDistance = 15;
+//	for (int StepsBack = 0; StepsBack < 3 and GoodLane<0; StepsBack++) {
+//		for (int Lane = 0; Lane < NumLanes; Lane++) {
+//
+//			auto itBACK = std::find_if(RoadMapNow[Lane].rbegin() + StepsBack * 15, RoadMapNow[Lane].rend(), [](int x) { return x > 0; });
+//			clearlanelengthsBACK[Lane] = std::distance(itBACK, RoadMapNow[Lane].rbegin() + StepsBack * 15);
+//			if (-clearlanelengthsBACK.at(Lane) > MaxClearDistance) {
+//				MaxClearDistance = -clearlanelengthsBACK.at(Lane);
+//				GoodLane = Lane;
+//				Horizon = FwdLimit - (StepsBack * 15);
+//			}
+//			std::cout << "At time = " << double(t_steps) * TimeIncrement << " Secs: clear back "
+//				<< -clearlanelengthsBACK[Lane] << " m from horizon in lane " << Lane << ".  with "
+//				<< StepsBack * 15 << " steps back." << std::endl;
+//		}
+//	}
+//
+//	GoalLane = GoodLane;
+//	GoalHorizon = Horizon;
+//	std::cout << "chose Target of Lane " << GoodLane << " at Horizon of " << Horizon << "m." << std::endl;
+//
+//	return(GoodLane);
+//}
 
 //int RoadMap::CheckForLaneChange( )
 //{
