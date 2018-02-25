@@ -10,7 +10,7 @@ This Project was built on top of the Path Planning framework provided by [Stanis
 3 path planners are included built on the PathPlanner Interface:
 1. KeepLanePathPlanner, that just goes straight with fixed speed, keeping lane (Generally unchanged from the starter code)
 2. SimpleSplineBasedPlanner, that uses a spline to create paths, and uses the first version of prediction code to determine othercar locations in the future, and if lanechanges should or can be made.
-3. JMTBasedPlanner, that solely uses jerk minimizing code to generate the vehicle trajectory (no spline) and uses a more sophisticated future prediction code to determine othercar locations in the future, and if lanechanges should or can be made. More details are provided in [Model Documentation](
+3. JMTBasedPlanner, that solely uses jerk minimizing code to generate the vehicle trajectory (no spline) and uses a more sophisticated future prediction code to determine othercar locations in the future, and if lanechanges should or can be made. More details for the Udacity assignment are provided in [Model Documentation](https://github.com/teeekay/CarND-T3-PathPlanning/blob/master/ModelDocumentation.md)
 
 ## Cartesian - Frenet Co-ordinate Conversion
 The default code to convert between Frenet and Cartesian Co-ordinates provided in the Udacity project is generally insufficient to produce good results in this project.  The simulator also produces bad results when locating points beyond the next waypoint.  The code to convert co-ordinates was augmented using the spline library to produce smoothed X, Y, dX, dY co-ordinates at 1 m intervals of S around the track.  These more granular values were used in higher resolution algorithms to generate better results. 
@@ -22,6 +22,9 @@ I integrated [SPDLog](https://github.com/gabime/spdlog), a "Very fast, header on
 Although this code works quite well, it does not compare the result of various alternative trajectories to evaluate which is best, but uses a procedural block to select a specific trajectory which is used.  In certain situations, (like another car suddenly braking in front of the Ego Car faster than default deceleration allows), this might allow the Car to determine that it can squeeze into another lane which it would normally not do based on default clearance requirements for lane changes, or apply stronger deceleration than is normally permitted, in order to avoid a collision.
 
 The prediction code does not take into account frenet "D" motion of othercars in order to predict that a car will be changing lanes in the future.
+
+## Using Windows Visual Studio 2017 CMAke folder open with local Ubuntu Bash on Windows
+I worked on [CMakeSettings.json](https://github.com/teeekay/CarND-T3-PathPlanning/blob/master/CMakeSettings.json) and [CppProperties.json](https://github.com/teeekay/CarND-T3-PathPlanning/blob/master/CppProperties.json) to enable Intellisense to work fairly well in Visual Studio 2017, and to be able to use Visual Studio with gdb for debugging with the Linux target.  These files need to be adapted to match your local paths, but should help point you in the right direction.
 
 -----
 
