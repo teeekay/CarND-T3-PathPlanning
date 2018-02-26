@@ -10,25 +10,7 @@
 
 ---
 
-### Building code
-
-The code can be built by running
-```sh
-mkdir build
-cmake..
-make
-```
-
-The model can be run from the build directory by calling:
-```sh
-./path-plan
-```
-
-The program was built starting with [Stanislav Olekhnovich's path planning starter code](https://github.com/fspirit/path-planning-starter).  I used this code to try to create a cleaner separation of code than is present in the default code provided by Udacity.
-
-I integrated the external logging code [spdlog](https://github.com/gabime/spdlog) to write output to the screen and logfiles.  The executable writes out to a logfile `PPlan.log` in the local directory where the program is run.
-
-[Header based spline code](http://kluge.in-chemnitz.de/opensource/spline/) was also used for trajectory generation, and to assist in implementing a better Frenet to Cartesian co-ordinate mapping, as described in README.md.
+### Code Description
 
 The program consists of the following code modules
 
@@ -54,7 +36,9 @@ The program consists of the following code modules
 
 ### Spline Based Trajectories and Planner
 
-Initially, I worked on developing a method to use the spline to generate trajectories in [SimpleSplineBasedPlanner](https://github.com/teeekay/CarND-T3-PathPlanning/blob/master/src/SimpleSplineBasedPlanner.cpp).  This was relatively easy, and worked well to adjoin new trajectories onto the existing path.  Experimentation with displacements in S between starting and ending the move from the center of one lane to the center of the adjoining lane, demonstrated safe limits to prevent excessive acceleration and jerk.  I also improved rudimentary logic to change lanes and prevent rear-ending other cars.  This code could generally satisfy the project requirements.
+Initially, I worked on developing a method to use the spline to generate trajectories in [SimpleSplineBasedPlanner](https://github.com/teeekay/CarND-T3-PathPlanning/blob/master/src/SimpleSplineBasedPlanner.cpp).  This was relatively easy, and worked well to adjoin new trajectories onto the existing path.  By experimenting with different path lengths when moving between lanes I was able to determine appropriate time/distance to prevent excessive acceleration or jerk during lane changes.
+
+I also developed rudimentary logic to change lanes and prevent rear-ending other cars.  This code could generally satisfy the project requirements.  However I decided to develop a planner which used JMT trajectories.
 
 ### JMT Based Planner
 
@@ -123,11 +107,35 @@ The car was heavily biased to move to the center lane, as it appeared that this 
 ## Improvements
 
 Several possible improvements have been identified above.  Additional possible improvements include:
- 1. Adding simulation of various alternative trajectories to avoid a predicted collision with a car ahead when no lane change options are available from the decision tree above, and default deceleration will not prevent the collision.
-  2. Adding simulation of reducing EgoCar velocity when stuck in traffic in an outside lane, while other Outside lane is clear of traffic to evaluate if a lanechange would become possible.
+ 1. Moving to path selection based on costs
+ 2. Adding simulation of various alternative trajectories to avoid a predicted collision with a car ahead when no lane change options are available from the decision tree above, and default deceleration will not prevent the collision.
+  3. Adding simulation of reducing EgoCar velocity when stuck in traffic in an outside lane, while other Outside lane is clear of traffic to evaluate if a lanechange would become possible.
 
+### Building code
 
- 
+The code can be built by running
+```sh
+mkdir build
+cmake..
+make
+```
+
+The model can be run from the build directory by calling:
+```sh
+./path-plan
+```
+
+### External Code used in the project
+
+The program was built starting with [Stanislav Olekhnovich's path planning starter code](https://github.com/fspirit/path-planning-starter).  I used this code so that I started with a cleaner separation of code than is present in the default code provided by Udacity.
+
+I integrated [spdlog](https://github.com/gabime/spdlog), a "Very fast, header only, C++ logging library", to write output to the screen and logfiles.  The executable writes out to a logfile `PPlan.log` in the local directory where the program is run.
+
+I also integrated the "header only" [spline code spline.h](http://kluge.in-chemnitz.de/opensource/spline/) from http://kluge.in-chemnitz.de/opensource/spline/ which I did not use directly in my submission to generate paths, but used to implement better Frenet to Cartesian co-ordinate mapping by interpolating values of parameters at 1m intervals between the waypoints provided in "highway_map.csv".
+
+The "header only" [json.hpp](https://github.com/nlohmann/json) from [https://github.com/nlohmann/json](https://github.com/nlohmann/json) is included by default with the project to decode and encode json messages between the program and the simulator.
+
+The code is also dependent on the [uWebSockets library](https://github.com/uWebSockets/uWebSockets) to open a websocket connection to the simulator. 
 
 
 
