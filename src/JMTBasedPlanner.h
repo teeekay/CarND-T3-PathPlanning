@@ -14,7 +14,6 @@
 #include "spdlog/fmt/ostr.h"
 
 
-
 const double JMTCarinfrontbuffer = 25.0;//19.0//20.0  //4 means you've hit it!
 
 enum EGOState {
