@@ -6,12 +6,19 @@
 //
 
 //#define TMK_SETUP
-#include <uWS/uWS.h>
 #ifdef TMK_SETUP
+#define MSVS_DEBUG
+#ifdef MSVS_DEBUG
+#include "/usr/include/uWS/uWS.h"
+#include "/mnt/c/Users/tknight/Source/Repos/CarND/CarND-T3-PathPlanning/src/Eigen-3.3/Eigen/Core"
+#else //not MSVS_DEBUG
+#include <uWS/uWS.h>
 #include <eigen3/Eigen/Core>
-#else
+#endif //MSVS_DEBUG
+#else //not TMK_SETUP
+#include <uWS/uWS.h>
 #include "Eigen-3.3/Eigen/Core"
-#endif
+#endif //TMK_Setup
 #include <fstream>
 #include <chrono>
 #include <ctime>
@@ -23,6 +30,7 @@
 #include "spdlog/sinks/sink.h"
 #include "spdlog/fmt/ostr.h"
 //namespace spd = spdlog;
+
 #ifdef MSVS_DEBUG
 #define LOGFILE "/mnt/c/Users/tknight/Source/Repos/CarND/CarND-T3-PathPlanning/Ubuntu_build/logs/PPlan.log"
 #define MAPFILE "/mnt/c/Users/tknight/Source/Repos/CarND/CarND-T3-PathPlanning/data/highway_map.csv"

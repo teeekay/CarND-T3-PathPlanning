@@ -295,6 +295,7 @@ int RoadMap::CheckForSlowCarsAhead()
 	// if we have at least 30 m in the next X second window, everything is fine (?)
 	//std::cout << "Showing " << MinLaneClearFWD.at(EgoCar.GetLane()) << " m clear ahead in lane " << EgoCar.GetLane()<< std::endl;
 	if(MinLaneClearFWD.at(EgoCar.GetLane()) > 30) return -1;
+	if (clearlanelengthsFWD.at(0).at(EgoCar.GetLane( )) >= FwdLimit) return -1;  //the car is not in our lane yet and you will blow up if you look here
 	int OtherCarID = RoadMapDeck.at(OtherCarsLayer).at(0).at(EgoCar.GetLane()).at(
 		    RevLimit + clearlanelengthsFWD.at(0).at(EgoCar.GetLane()));
 	_RML->info("Found OtherCarID = {:d} at distance of {:d} m.", OtherCarID-1, clearlanelengthsFWD.at(0).at(EgoCar.GetLane()) );
@@ -306,6 +307,7 @@ int RoadMap::CheckForSlowCarsAhead(double distance)
 	// if we have at least 30 m in the next X second window, everything is fine (?)
 	//std::cout << "Showing " << MinLaneClearFWD.at(EgoCar.GetLane()) << " m clear ahead in lane " << EgoCar.GetLane() << std::endl;
 	if (MinLaneClearFWD.at(EgoCar.GetLane()) > distance) return -1; //within time frame (2 secs, the car will be within buffer distance )
+	if (clearlanelengthsFWD.at(0).at(EgoCar.GetLane( )) >= FwdLimit) return -1;  //the car is not in our lane yet and you will blow up if you look here
 	int OtherCarID = RoadMapDeck.at(OtherCarsLayer).at(0).at(EgoCar.GetLane()).at(
 		RevLimit + clearlanelengthsFWD.at(0).at(EgoCar.GetLane()));
 	_RML->info("RoadMap: Found OtherCarID {:d} at distance of {:d} m.",
@@ -319,6 +321,7 @@ int RoadMap::CheckForSlowCarsAhead(double distance)
 int RoadMap::CheckForSlowCarInOtherLane(int targetLane, double distance)
 {
 	if (MinLaneClearFWD.at(targetLane) > distance) return -1; //within time frame (2 secs, the car will be within buffer distance )
+	if (clearlanelengthsFWD.at(0).at(targetLane) >= FwdLimit) return -1;
 	int OtherCarID = RoadMapDeck.at(OtherCarsLayer).at(0).at(targetLane).at(
 		RevLimit + clearlanelengthsFWD.at(0).at(targetLane));
 	_RML->info("RoadMap: Found OtherCarID {:d} at distance of {:d} m.",
