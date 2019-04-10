@@ -4,7 +4,7 @@
 by Anthony M. Knight
 
 ## Original Framework
-This Project was built on top of the Path Planning framework provided by [Stanislav Olekhnovich in his Github Path Planning Starter](https://github.com/fspirit/path-planning-starter).  I used this in my project in order to try to learn how to separate and use object oriented C++ coding rather than the default starter code [provided in Udacity's Github](https://github.com/udacity/CarND-Path-Planning-Project), which tends to be long blocks of procedural code mixed in main() with the WebSocket handling code.
+This Project was built on top of the Path Planning framework provided by [Stanislav Olekhnovich in his Github Path Planning Starter](https://github.com/fspirit/path-planning-starter).  I used this in my project in order to use object oriented C++ coding rather than the default starter code [provided in Udacity's Github](https://github.com/udacity/CarND-Path-Planning-Project), which tends to be long blocks of procedural code mixed in main() with the WebSocket handling code.
 
 ## PathPlanners
 3 path planners are included built on the PathPlanner Interface:
